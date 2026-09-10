@@ -1,3 +1,4 @@
+<meta charset="UTF-8">
 <title>Partfinder BOM Copilot</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Source+Sans+3:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
@@ -216,6 +217,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   font-size:12px; white-space:nowrap;
 }
 .col-menu label{display:flex; align-items:center; gap:7px; color:var(--ink);}
+.col-menu[hidden]{display:none;}
 
 .table-scroll{overflow-x:auto;}
 .parts-table{
@@ -560,7 +562,10 @@ function fmtStock(n){
   return String(n);
 }
 function fmtPrice(p){ return "$" + p.toFixed(4).replace(/0+$/,"").replace(/\.$/,".0000").slice(0, p<0.01?6:5); }
-function money(n){ return "$" + n.toLocaleString("en-US",{minimumFractionDigits:2, maximumFractionDigits:2}); }
+function money(n){
+  if(n > 0 && n < 0.01) return "$" + n.toFixed(4).replace(/0+$/,"").replace(/\.$/,"");
+  return "$" + n.toLocaleString("en-US",{minimumFractionDigits:2, maximumFractionDigits:2});
+}
 
 function setQuery(q){
   document.getElementById("queryInput").value = q;
@@ -705,6 +710,17 @@ function setMode(mode){
   document.getElementById("whyPanel").style.display = "none";
 }
 
+function bestKeywordMatch(text){
+  const words = text.toLowerCase().split(/[\s,]+/).filter(w => w.length > 2);
+  let best = null, bestScore = 0;
+  Object.keys(CATALOG).forEach(k => {
+    const kLower = k.toLowerCase();
+    const score = words.filter(w => kLower.includes(w)).length;
+    if(score > bestScore){ bestScore = score; best = k; }
+  });
+  return bestScore >= 2 ? best : null;
+}
+
 function runBatch(){
   const lines = document.getElementById("batchInput").value.split("\n").map(l=>l.trim()).filter(Boolean);
   let added = 0, unresolved = 0;
@@ -713,7 +729,7 @@ function runBatch(){
     const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
     const text = qtyMatch ? line.slice(qtyMatch[0].length) : line;
     const key = Object.keys(CATALOG).find(k => k.toLowerCase().includes(text.toLowerCase().split(",")[0].split(" ").slice(0,3).join(" ").toLowerCase()))
-      || Object.keys(CATALOG).find(k => text.toLowerCase().split(/[\s,]+/).filter(w=>w.length>2).some(w => k.toLowerCase().includes(w)));
+      || bestKeywordMatch(text);
     if(key){
       const best = CATALOG[key].find(p=>p.best) || CATALOG[key][0];
       const existing = bom.find(l => l.dk === best.dk);
@@ -808,12 +824,10 @@ function checkout(){
 
 function renderCart(){
   const listEl = document.getElementById("cartList");
-  const emptyEl = document.getElementById("cartEmpty");
   document.getElementById("cartCount").textContent = cart.length + (cart.length===1?" line":" lines");
 
   if(cart.length === 0){
-    listEl.innerHTML = "";
-    listEl.appendChild(emptyEl);
+    listEl.innerHTML = '<div class="bom-empty" id="cartEmpty">No parts added yet. Click Add on a result above.</div>';
   } else {
     listEl.innerHTML = cart.map(l => `
       <div class="bom-row">
@@ -842,12 +856,10 @@ function renderCart(){
 
 function renderBom(){
   const listEl = document.getElementById("bomList");
-  const emptyEl = document.getElementById("bomEmpty");
   document.getElementById("bomCount").textContent = bom.length + (bom.length===1?" line":" lines");
 
   if(bom.length === 0){
-    listEl.innerHTML = "";
-    listEl.appendChild(emptyEl);
+    listEl.innerHTML = '<div class="bom-empty" id="bomEmpty">No parts added yet. Search on the left, then add a result to start the BOM.</div>';
   } else {
     listEl.innerHTML = bom.map(l => `
       <div class="bom-row">
