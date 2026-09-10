@@ -282,8 +282,28 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .row.row-best{border-left-color:var(--accent);}
 
 .cell-part{min-width:0;}
-.cell-part.has-photo{display:flex; gap:8px; align-items:flex-start; min-width:0;}
-.cell-part .part-thumb{width:34px; height:34px; object-fit:contain; background:#fff; border:1px solid var(--line); border-radius:4px; flex:none; padding:2px;}
+.cell-part.has-photo{display:flex; gap:10px; align-items:flex-start; min-width:0;}
+.part-photo{
+  flex:none; width:56px; height:56px; padding:0; margin:0;
+  border:1px solid var(--line); border-radius:var(--radius-sm);
+  background:#f3f4f5; cursor:zoom-in; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  transition:border-color .16s ease, box-shadow .16s ease;
+}
+.part-photo:hover, .part-photo:focus-visible{
+  border-color:var(--accent); box-shadow:0 1px 6px rgba(20,24,28,.16);
+}
+.part-photo.is-empty{
+  cursor:default; box-shadow:none; pointer-events:none;
+  background:
+    linear-gradient(135deg, transparent 46%, var(--line) 46%, var(--line) 54%, transparent 54%),
+    #eceeef;
+  background-size:100% 100%;
+}
+.part-photo .part-thumb{
+  width:100%; height:100%; object-fit:contain; background:#fff; padding:3px;
+  display:block;
+}
 .cell-part .part-text{min-width:0; flex:1 1 auto;}
 .cell-part .mpn{font-family:"IBM Plex Mono"; font-weight:600; font-size:12.5px;}
 .cell-part .star{color:var(--accent); font-size:11px; margin-right:3px;}
@@ -324,6 +344,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .qty-frac.met{color:var(--good);}
 
 .cart-panel{margin-top:0;}
+.cart-panel[hidden], .bom-panel[hidden]{display:none !important;}
 
 .about-row{text-align:center; padding-top:2px;}
 .about-row .linklike{font-size:10.5px;}
@@ -413,6 +434,49 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   opacity:0; pointer-events:none; transition:opacity .18s ease, transform .18s ease;
 }
 .toast.show{opacity:1; transform:translateX(-50%) translateY(-4px);}
+
+.photo-flyout{
+  position:fixed; z-index:40; width:240px; height:240px;
+  padding:8px; background:var(--surface); border:1px solid var(--line-strong);
+  border-radius:var(--radius-md); box-shadow:0 8px 28px rgba(20,24,28,.22);
+  pointer-events:none;
+}
+.photo-flyout[hidden]{display:none;}
+.photo-flyout img{
+  width:100%; height:100%; object-fit:contain; background:#fff; display:block;
+  border-radius:2px;
+}
+
+.photo-lightbox{
+  position:fixed; inset:0; z-index:50;
+  display:flex; align-items:center; justify-content:center; padding:28px;
+}
+.photo-lightbox[hidden]{display:none;}
+.photo-lightbox-backdrop{
+  position:absolute; inset:0; border:0; padding:0;
+  background:rgba(18,22,26,.62); cursor:zoom-out;
+}
+.photo-lightbox figure{
+  position:relative; margin:0; max-width:min(720px, 92vw); max-height:86vh;
+  background:var(--surface); border:1px solid var(--line-strong);
+  border-radius:var(--radius-md); box-shadow:0 12px 40px rgba(20,24,28,.32);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.photo-lightbox img{
+  display:block; max-width:min(720px, 92vw); max-height:74vh;
+  object-fit:contain; background:#fff; padding:18px;
+}
+.photo-lightbox figcaption{
+  padding:8px 14px 10px; font-family:"IBM Plex Mono"; font-size:12px;
+  border-top:1px solid var(--line); color:var(--ink);
+}
+.photo-lightbox-close{
+  position:absolute; top:8px; right:8px; width:28px; height:28px;
+  border:1px solid var(--line); background:var(--surface); color:var(--ink);
+  border-radius:var(--radius-sm); font-size:16px; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+}
+.photo-lightbox-close:hover{color:var(--bad); border-color:var(--line-strong);}
 </style>
 
 <div class="app" id="app">
@@ -501,7 +565,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
               <div class="col-menu" id="colMenu" hidden>
                 <label><input type="checkbox" id="colMfr" onchange="setColumn('manufacturer', this.checked)"> Manufacturer</label>
                 <label><input type="checkbox" id="colMoq" onchange="setColumn('moq', this.checked)"> MOQ</label>
-                <label><input type="checkbox" id="colPhoto" onchange="setColumn('photo', this.checked)"> Photo</label>
+                <label><input type="checkbox" id="colPhoto" onchange="setColumn('photo', this.checked)" checked> Photo</label>
                 <label><input type="checkbox" id="colSeries" onchange="setColumn('series', this.checked)"> Series</label>
                 <label><input type="checkbox" id="colLead" onchange="setColumn('leadtime', this.checked)"> Lead time</label>
                 <label><input type="checkbox" id="colRisk" onchange="setColumn('risk', this.checked)"> Risk flags</label>
@@ -527,10 +591,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
       <div id="extraBlocks"></div>
 
-      <div class="panel cart-panel">
+      <div class="panel cart-panel" id="cartPanel" hidden>
         <div class="bom-head">
           <span><h2 style="display:inline;">Cart</h2> <span class="bom-count" id="cartCount">0 lines</span></span>
-          <button class="linklike" onclick="toggleBomPanel()" id="bomToggleLink">Show BOM</button>
+          <button class="linklike" onclick="toggleBomPanel()" id="bomToggleLink" hidden>Show BOM</button>
         </div>
         <div class="bom-list" id="cartList" style="max-height:none; overflow-y:visible;">
           <div class="bom-empty" id="cartEmpty">No parts added yet. Use + on a result above.</div>
@@ -577,6 +641,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="photo-flyout" id="photoFlyout" hidden><img alt=""></div>
+<div class="photo-lightbox" id="photoLightbox" hidden>
+  <button class="photo-lightbox-backdrop" onclick="closePhotoLightbox()" aria-label="Close photo"></button>
+  <figure>
+    <button class="photo-lightbox-close" onclick="closePhotoLightbox()" aria-label="Close">×</button>
+    <img id="photoLightboxImg" alt="">
+    <figcaption id="photoLightboxCap"></figcaption>
+  </figure>
+</div>
 
 <script src="demo-data.js"></script>
 <script>
@@ -634,7 +707,8 @@ let bom = [];
 let bomIdSeq = 1;
 let cart = [];
 let cartIdSeq = 1;
-let colState = { manufacturer: false, moq: false, photo: false, series: false, leadtime: false, risk: false, compliance: false, description: false, category: false, crossref: false };
+let bomUserHidden = false;
+let colState = { manufacturer: false, moq: false, photo: true, series: false, leadtime: false, risk: false, compliance: false, description: false, category: false, crossref: false };
 
 function allResultRows(){
   return searchBlocks.flatMap(b => b.results || []);
@@ -1158,9 +1232,15 @@ function checkout(){
 }
 
 function setBomPanelVisible(show){
-  document.getElementById("bomPanel").hidden = !show;
-  document.getElementById("mainGrid").classList.toggle("bom-collapsed", !show);
-  document.getElementById("bomToggleLink").textContent = show ? "Hide BOM" : "Show BOM";
+  const populated = bom.length > 0;
+  if(show) bomUserHidden = false;
+  else if(populated) bomUserHidden = true;
+  const visible = show && populated;
+  document.getElementById("bomPanel").hidden = !visible;
+  document.getElementById("mainGrid").classList.toggle("bom-collapsed", !visible);
+  const toggle = document.getElementById("bomToggleLink");
+  toggle.hidden = !populated;
+  toggle.textContent = visible ? "Hide BOM" : "Show BOM";
 }
 
 function toggleBomPanel(){
@@ -1170,6 +1250,10 @@ function toggleBomPanel(){
 function renderCart(){
   const listEl = document.getElementById("cartList");
   document.getElementById("cartCount").textContent = cart.length + (cart.length===1?" line":" lines");
+  document.getElementById("cartPanel").hidden = cart.length === 0;
+  if(cart.length === 0 && bom.length > 0 && bomUserHidden){
+    setBomPanelVisible(true);
+  }
 
   if(cart.length === 0){
     listEl.innerHTML = '<div class="bom-empty" id="cartEmpty">No parts added yet. Use + on a result above.</div>';
@@ -1202,6 +1286,7 @@ function renderCart(){
 function renderBom(){
   const listEl = document.getElementById("bomList");
   document.getElementById("bomCount").textContent = bom.length + (bom.length===1?" line":" lines");
+  setBomPanelVisible(bom.length > 0 && !bomUserHidden);
 
   if(bom.length === 0){
     listEl.innerHTML = '<div class="bom-empty" id="bomEmpty">No parts added yet. Search on the left, then add a result to start the BOM.</div>';
