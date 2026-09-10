@@ -276,6 +276,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .add-link:hover{text-decoration:underline;}
 .add-link.added{color:var(--good);}
 
+.cell-qty{display:flex; align-items:center; justify-content:flex-end; gap:7px;}
+.qty-frac{color:var(--muted); font-size:11.5px;}
+.qty-frac.met{color:var(--good);}
+
+.cart-panel{margin-top:0;}
+
 .about-row{text-align:center; padding-top:2px;}
 .about-row .linklike{font-size:10.5px;}
 .about-detail{
@@ -424,6 +430,25 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
         </div>
       </div>
 
+      <div class="panel cart-panel">
+        <div class="bom-head">
+          <h2>Cart</h2>
+          <span class="bom-count" id="cartCount">0 lines</span>
+        </div>
+        <div class="bom-list" id="cartList" style="max-height:none; overflow-y:visible;">
+          <div class="bom-empty" id="cartEmpty">No parts added yet. Click Add on a result above.</div>
+        </div>
+        <div class="bom-summary">
+          <div class="sum-row"><span>Line items</span><span class="v" id="cartSumLines">0</span></div>
+          <div class="sum-row"><span>Total units</span><span class="v" id="cartSumUnits">0</span></div>
+          <div class="sum-row total"><span>Estimated cost</span><span class="v" id="cartSumCost">$0.00</span></div>
+          <div class="bom-actions">
+            <button class="btn-primary" onclick="checkout()">Checkout → BOM</button>
+            <button class="linklike" onclick="clearCart()">Clear cart</button>
+          </div>
+        </div>
+      </div>
+
       <div class="about-row">
         <button class="linklike" onclick="toggleAbout()" id="aboutLink">About this data</button>
         <div class="about-detail" id="aboutDetail">Sample catalog data · endpoints modeled on DigiKey Product Information v4 (KeywordSearch, ProductDetails, Substitutions) and Quote v4</div>
@@ -503,6 +528,8 @@ let currentResults = [];
 let currentSortMode = "fit";
 let bom = [];
 let bomIdSeq = 1;
+let cart = [];
+let cartIdSeq = 1;
 let colState = { manufacturer: false, moq: false };
 
 const INTERP = {
@@ -591,7 +618,7 @@ function buildColsString(){
   cols.push("64px");
   cols.push("72px");
   cols.push("76px");
-  cols.push("50px");
+  cols.push("92px");
   return cols.join(" ");
 }
 
@@ -605,7 +632,7 @@ function renderHeader(){
   cells.push('<div class="right">Unit</div>');
   cells.push('<div class="right">Qty 100</div>');
   cells.push("<div>Lifecycle</div>");
-  cells.push("<div></div>");
+  cells.push('<div class="right">Qty</div>');
   document.getElementById("rowHead").innerHTML = cells.join("");
 }
 
@@ -618,7 +645,14 @@ function sortResults(mode){
   renderResults(arr);
 }
 
+let lastRenderedArr = [];
+
+function refreshResults(){
+  if(lastRenderedArr.length) renderResults(lastRenderedArr);
+}
+
 function renderResults(arr){
+  lastRenderedArr = arr;
   document.getElementById("resultCount").textContent = arr.length;
   renderHeader();
   const list = document.getElementById("resultList");
@@ -646,7 +680,13 @@ function renderResults(arr){
     cells.push(`<div class="right mono">${fmtPrice(r.price)}</div>`);
     cells.push(`<div class="right mono">${money(r.price*100)}</div>`);
     cells.push(`<div class="cell-life ${r.lifecycle === 'NRND' ? 'life-warn' : ''}">${r.lifecycle}</div>`);
-    cells.push(`<div><button class="add-link" id="add-${r.dk}" onclick="addToBom('${r.dk}')">Add</button></div>`);
+    const cartLine = cart.find(c => c.dk === r.dk);
+    const cartQty = cartLine ? cartLine.qty : 0;
+    const rec = recommendedQty(nextDesignators(r));
+    cells.push(`<div class="cell-qty">
+      <span class="qty-frac mono ${cartQty >= rec && cartQty > 0 ? 'met' : ''}" title="In cart / recommended quantity, based on designators ${nextDesignators(r)}">${cartQty}/${rec}</span>
+      <button class="add-link" id="add-${r.dk}" onclick="addToCart('${r.dk}')">Add</button>
+    </div>`);
 
     return `<div class="row ${r.best ? 'row-best' : ''}">${cells.join("")}</div>`;
   }).join("");
@@ -691,17 +731,26 @@ function findPart(dk){
   for(const key in CATALOG){ const hit = CATALOG[key].find(p=>p.dk===dk); if(hit) return hit; }
 }
 
-function addToBom(dk){
+function addToCart(dk){
   const part = findPart(dk);
-  const existing = bom.find(l => l.dk === dk);
+  const existing = cart.find(l => l.dk === dk);
   if(existing){ existing.qty += 1; }
   else{
-    bom.push({id: bomIdSeq++, dk: part.dk, mpn: part.mpn, mfr: part.mfr, price: part.price, stock: part.stock, status: part.status, qty: 1, desig: nextDesignators(part)});
+    cart.push({id: cartIdSeq++, dk: part.dk, mpn: part.mpn, mfr: part.mfr, price: part.price, stock: part.stock, status: part.status, qty: 1, desig: nextDesignators(part)});
   }
-  renderBom();
+  renderCart();
+  refreshResults();
   const btn = document.getElementById("add-"+dk);
   if(btn){ btn.textContent = "Added"; btn.classList.add("added"); setTimeout(()=>{btn.textContent="Add"; btn.classList.remove("added");}, 1100); }
-  showToast(part.mpn + " added to BOM");
+  showToast(part.mpn + " added to cart");
+}
+
+function recommendedQty(desigText){
+  if(!desigText || desigText === "—") return 1;
+  if(desigText.includes(",")) return desigText.split(",").length;
+  const range = desigText.match(/^([A-Za-z]+)(\d+)[–-]([A-Za-z]*)(\d+)$/);
+  if(range) return parseInt(range[4], 10) - parseInt(range[2], 10) + 1;
+  return 1;
 }
 
 const DESIG_MAP = {
@@ -722,6 +771,73 @@ function changeQty(id, delta){
 function removeLine(id){
   bom = bom.filter(l=>l.id!==id);
   renderBom();
+}
+
+function changeCartQty(id, delta){
+  const line = cart.find(l=>l.id===id);
+  if(!line) return;
+  line.qty = Math.max(1, line.qty + delta);
+  renderCart();
+  refreshResults();
+}
+function removeCartLine(id){
+  cart = cart.filter(l=>l.id!==id);
+  renderCart();
+  refreshResults();
+}
+function clearCart(){
+  if(cart.length === 0) return;
+  cart = [];
+  renderCart();
+  refreshResults();
+}
+function checkout(){
+  if(cart.length === 0){ showToast("Cart is empty"); return; }
+  cart.forEach(c => {
+    const existing = bom.find(b => b.dk === c.dk);
+    if(existing){ existing.qty += c.qty; }
+    else{ bom.push({id: bomIdSeq++, dk: c.dk, mpn: c.mpn, mfr: c.mfr, price: c.price, stock: c.stock, status: c.status, qty: c.qty, desig: c.desig}); }
+  });
+  const count = cart.length;
+  cart = [];
+  renderCart();
+  renderBom();
+  refreshResults();
+  showToast(`Moved ${count} line${count===1?'':'s'} to BOM`);
+}
+
+function renderCart(){
+  const listEl = document.getElementById("cartList");
+  const emptyEl = document.getElementById("cartEmpty");
+  document.getElementById("cartCount").textContent = cart.length + (cart.length===1?" line":" lines");
+
+  if(cart.length === 0){
+    listEl.innerHTML = "";
+    listEl.appendChild(emptyEl);
+  } else {
+    listEl.innerHTML = cart.map(l => `
+      <div class="bom-row">
+        <div class="bom-row-main">
+          <div class="mpn mono">${l.mpn}</div>
+          <div class="bom-row-meta">${l.mfr} · ${fmtPrice(l.price)}/ea</div>
+          <span class="bom-desig">${l.desig}</span>
+        </div>
+        <div class="bom-qty">
+          <button class="qty-step" onclick="changeCartQty(${l.id}, -1)">−</button>
+          <span class="qty-val mono">${l.qty}</span>
+          <button class="qty-step" onclick="changeCartQty(${l.id}, 1)">+</button>
+        </div>
+        <div class="bom-linetotal">${money(l.price * l.qty)}</div>
+        <button class="bom-remove" onclick="removeCartLine(${l.id})" aria-label="Remove line">×</button>
+      </div>
+    `).join("");
+  }
+
+  const totalUnits = cart.reduce((s,l)=>s+l.qty,0);
+  const totalCost = cart.reduce((s,l)=>s+l.qty*l.price,0);
+  document.getElementById("cartSumLines").textContent = cart.length;
+  document.getElementById("cartSumUnits").textContent = totalUnits;
+  document.getElementById("cartSumCost").textContent = money(totalCost);
 }
 
 function renderBom(){
@@ -920,7 +1036,13 @@ document.addEventListener("click", e => {
 loadTunerColors();
 renderHeader();
 runSearch();
-addToBom("609-4612-1-ND");
-addToBom("296-TPS62203DBVR-ND");
+(function seedBom(){
+  [["609-4612-1-ND",1], ["296-TPS62203DBVR-ND",1]].forEach(([dk, qty]) => {
+    const part = findPart(dk);
+    bom.push({id: bomIdSeq++, dk: part.dk, mpn: part.mpn, mfr: part.mfr, price: part.price, stock: part.stock, status: part.status, qty, desig: nextDesignators(part)});
+  });
+})();
 renderBom();
+renderCart();
+refreshResults();
 </script>
