@@ -689,7 +689,7 @@ body.modal-open{overflow:hidden;}
               <button class="linklike" onclick="toggleColMenu()">Columns</button>
               <div class="col-menu" id="colMenu" hidden>
                 <label><input type="checkbox" id="colMfr" onchange="setColumn('manufacturer', this.checked)"> Manufacturer</label>
-                <label><input type="checkbox" id="colMoq" onchange="setColumn('moq', this.checked)"> MOQ</label>
+                <label><input type="checkbox" id="colMoq" onchange="setColumn('moq', this.checked)" checked> MOQ</label>
                 <label><input type="checkbox" id="colPhoto" onchange="setColumn('photo', this.checked)" checked> Photo</label>
                 <label><input type="checkbox" id="colSeries" onchange="setColumn('series', this.checked)"> Series</label>
                 <label><input type="checkbox" id="colLead" onchange="setColumn('leadtime', this.checked)"> Lead time</label>
@@ -843,7 +843,7 @@ let bomIdSeq = 1;
 let cart = [];
 let cartIdSeq = 1;
 let bomUserHidden = false;
-let colState = { manufacturer: false, moq: false, photo: true, series: false, leadtime: false, risk: false, compliance: false, description: false, category: false, crossref: false };
+let colState = { manufacturer: false, moq: true, photo: true, series: false, leadtime: false, risk: false, compliance: false, description: false, category: false, crossref: false };
 
 function allResultRows(){
   return searchBlocks.flatMap(b => b.results || []);
