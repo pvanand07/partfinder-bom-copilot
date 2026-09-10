@@ -333,15 +333,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .cell-qty{display:flex; align-items:center; justify-content:center;}
 .cell-qty-head{text-align:center;}
 .cell-rec-head{
-  text-align:center; font-weight:600; color:var(--muted); letter-spacing:.03em;
+  font-weight:600; color:var(--muted); letter-spacing:.03em;
 }
 .rec-spinner{display:inline-block; animation:rec-pulse 1s ease-in-out infinite;}
 @keyframes rec-pulse{0%,100%{opacity:.3;} 50%{opacity:1;}}
-.cell-rec{
-  text-align:center; color:var(--muted); font-size:11.5px; padding-top:2px;
-}
-.cell-rec.met{color:var(--good);}
-.cell-rec.pending{opacity:.5; font-style:italic;}
+.cell-rec{min-width:0;}
+.cell-rec-qty{font-size:12.5px; font-weight:600; color:var(--ink);}
+.cell-rec.met .cell-rec-qty{color:var(--good);}
+.cell-rec-reason{color:var(--muted); font-size:11px; margin-top:1px; line-height:1.35;}
+.cell-rec.pending .cell-rec-reason{font-style:italic;}
 .cell-qty .bom-qty .qty-frac{
   font-family:"IBM Plex Mono"; font-size:12px; min-width:16px; text-align:center;
   color:var(--ink);
@@ -1058,7 +1058,7 @@ function buildColsString(){
   if(colState.risk) cols.push("100px");
   if(colState.compliance) cols.push("150px");
   if(colState.crossref) cols.push("160px");
-  cols.push("40px");
+  cols.push("minmax(0,1.3fr)");
   cols.push("78px");
   return cols.join(" ");
 }
@@ -1081,7 +1081,7 @@ function tableMinWidth(){
   if(colState.risk) w += 100;
   if(colState.compliance) w += 150;
   if(colState.crossref) w += 160;
-  w += 40 + 78; // Rec, Qty
+  w += 220 + 78; // Rec (now shows reasoning text, not just a number), Qty
   return w;
 }
 
@@ -1101,7 +1101,7 @@ function buildHeaderCellsHtml(){
   if(colState.risk) cells.push("<div>Risk</div>");
   if(colState.compliance) cells.push("<div>Compliance</div>");
   if(colState.crossref) cells.push("<div>Cross-ref</div>");
-  cells.push(`<div class="cell-rec-head">Rec${pendingRecommendCount > 0 ? ' <span class="rec-spinner" title="Getting AI recommendations…">⋯</span>' : ''}</div>`);
+  cells.push(`<div class="cell-rec-head">AI recommendation${pendingRecommendCount > 0 ? ' <span class="rec-spinner" title="Getting AI recommendations…">⋯</span>' : ''}</div>`);
   cells.push('<div class="cell-qty-head">Qty</div>');
   return cells.join("");
 }
@@ -1206,10 +1206,13 @@ function buildResultRowHtml(r){
   const cartLine = cart.find(c => c.dk === r.dk);
   const cartQty = cartLine ? cartLine.qty : 0;
   const rec = recQtyFor(r);
-  const recTitle = r.recommendedQty != null
+  const recReasonText = r.recommendedQty != null
     ? (r.reason || "AI-recommended quantity")
-    : `Awaiting AI recommendation — showing MOQ (${r.moq})`;
-  cells.push(`<div class="cell-rec mono ${cartQty >= rec && cartQty > 0 ? 'met' : ''} ${r.recommendedQty == null ? 'pending' : ''}" title="${recTitle.replace(/"/g,'&quot;')}">${rec}</div>`);
+    : `Awaiting AI recommendation — showing MOQ`;
+  cells.push(`<div class="cell-rec ${cartQty >= rec && cartQty > 0 ? 'met' : ''} ${r.recommendedQty == null ? 'pending' : ''}">
+    <div class="cell-rec-qty mono">${rec.toLocaleString()}</div>
+    <div class="cell-rec-reason">${escHtml(recReasonText)}</div>
+  </div>`);
   cells.push(`<div class="cell-qty">
     <div class="bom-qty">
       <button class="qty-step" onclick="changeResultCartQty('${r.dk}', -1)" aria-label="Decrease quantity"${cartQty === 0 ? ' disabled' : ''}>−</button>
