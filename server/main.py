@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -7,15 +8,17 @@ load_dotenv()
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from server import nl_parser, ranking, search_cache
+from server.bom_export import build_bom_workbook
 from server.digikey_client import DigikeyClient, DigikeyError
 from server.schemas import (
     BatchLineResult,
     BatchSearchRequest,
     BatchSearchResponse,
+    BomExportRequest,
     ParsedItem,
     ParseResult,
     Recommendation,
@@ -28,7 +31,7 @@ from server.schemas import (
 
 logger = logging.getLogger("partfinder")
 
-app = FastAPI(title="Partfinder BOM Copilot API")
+app = FastAPI(title="DigiSearch API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -380,6 +383,19 @@ def recommend(req: RecommendRequest):
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+@app.post("/api/export-bom")
+def export_bom(req: BomExportRequest):
+    if not req.lines:
+        raise HTTPException(status_code=400, detail="BOM is empty")
+    data = build_bom_workbook([line.model_dump() for line in req.lines])
+    filename = f"DigiSearch-BOM-{datetime.now().strftime('%Y-%m-%d')}.xlsx"
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"

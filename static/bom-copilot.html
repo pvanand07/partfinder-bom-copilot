@@ -1,5 +1,5 @@
 <meta charset="UTF-8">
-<title>Partfinder BOM Copilot</title>
+<title>DigiSearch</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Source+Sans+3:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
@@ -88,17 +88,29 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   display:flex;
   align-items:center;
   justify-content:space-between;
-  gap:9px;
-  padding-bottom:11px;
+  gap:14px;
+  padding:4px 0 16px;
   border-bottom:1px solid var(--line);
   font-size:13.5px;
   position:relative;
 }
-.brand{display:flex; align-items:center; gap:9px;}
-.brand-mark{flex:none; display:block;}
-.brand-name{font-family:"Archivo"; font-weight:700; font-size:14.5px; letter-spacing:-.005em;}
-.brand-sep{color:var(--line);}
-.brand-proj{color:var(--muted);}
+.brand{
+  display:flex; align-items:center; gap:12px;
+  min-width:0; color:inherit; text-decoration:none;
+}
+.brand-mark{
+  flex:none; display:block; width:42px; height:42px;
+  border-radius:7px;
+}
+.brand-name{
+  font-family:"Archivo", ui-sans-serif, sans-serif;
+  font-weight:800; font-size:28px; letter-spacing:-.045em;
+  line-height:.95; color:var(--ink);
+}
+@media (max-width:720px){
+  .brand-mark{width:36px; height:36px;}
+  .brand-name{font-size:22px;}
+}
 
 .tuner-toggle{
   flex:none; display:flex; align-items:center; gap:6px;
@@ -179,13 +191,44 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   border-radius:var(--radius-md);
   padding:7px 10px;
   background:var(--surface);
+  position:relative;
+  overflow:visible;
   transition:border-color var(--dur-ui) var(--ease), box-shadow var(--dur-ui) var(--ease);
 }
+.search-box > *{position:relative; z-index:1;}
 .search-box:focus-within{
   border-color:var(--accent);
   box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
-.search-box svg{flex:none; color:var(--muted);}
+.search-box svg{flex:none; color:var(--muted); transition:color var(--dur-ui) var(--ease);}
+.search-box.is-searching{
+  border-color:var(--accent);
+  overflow:hidden;
+}
+.search-box.is-searching svg{
+  color:var(--accent);
+  animation:search-icon-pulse 2.2s ease-in-out infinite;
+}
+.search-box.is-searching::after{
+  content:"";
+  position:absolute; inset:0 auto 0 0; width:42%;
+  background:linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--accent) 16%, transparent) 50%, transparent 100%);
+  animation:search-sweep 2.4s ease-in-out infinite;
+  pointer-events:none; z-index:0;
+}
+.search-block.is-searching .examples{
+  opacity:.45; pointer-events:none;
+  transition:opacity var(--dur-ui) var(--ease);
+}
+@keyframes search-sweep{
+  0%{transform:translateX(-80%); opacity:.35;}
+  50%{opacity:1;}
+  100%{transform:translateX(280%); opacity:.35;}
+}
+@keyframes search-icon-pulse{
+  0%,100%{opacity:1;}
+  50%{opacity:.5;}
+}
 .search-box input{
   flex:1; border:0; background:transparent; color:var(--ink);
   font-size:13.5px; outline:none; font-family:inherit;
@@ -243,12 +286,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .why-panel[hidden]{display:none;}
 .why-panel:not([hidden]){animation:panel-content-in var(--dur-ui) var(--ease-out) both;}
-.cache-note{
-  margin-top:7px; font-size:12px; color:var(--warn); max-width:70ch;
-}
-.cache-note.fresh{color:var(--muted);}
-.cache-note[hidden]{display:none !important;}
-.panel > .cache-note{display:block; padding:0 15px 8px; margin-top:0;}
 
 /* Results */
 .results-toolbar{
@@ -283,10 +320,37 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   transform:scale(.96) translateY(-4px);
 }
 
-.table-scroll{overflow-x:auto;}
+.table-scroll{overflow-x:auto; position:relative;}
 .parts-table{
   min-width:720px;
   --cols: minmax(0,1.5fr) minmax(0,1.7fr) 78px 64px 72px 76px 50px;
+  transition:opacity var(--dur-ui) var(--ease);
+}
+#resultsPanel.is-searching .parts-table,
+#extraBlocks.is-searching .parts-table{
+  opacity:.48;
+  pointer-events:none;
+}
+#resultsPanel.is-searching .table-scroll::before,
+#extraBlocks.is-searching .table-scroll::before{
+  content:"";
+  position:absolute; top:0; left:0;
+  height:3px; width:34%;
+  background:var(--accent);
+  animation:table-load-bar 1.55s var(--ease) infinite;
+  pointer-events:none; z-index:3;
+}
+#resultsPanel.is-searching .table-scroll::after,
+#extraBlocks.is-searching .table-scroll::after{
+  content:"";
+  position:absolute; inset:0 auto 0 0; width:42%;
+  background:linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--accent) 16%, transparent) 50%, transparent 100%);
+  animation:search-sweep 2.4s ease-in-out infinite;
+  pointer-events:none; z-index:1;
+}
+@keyframes table-load-bar{
+  0%{transform:translateX(-100%);}
+  100%{transform:translateX(400%);}
 }
 .row-head, .row{
   display:grid;
@@ -372,14 +436,25 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .cell-qty-head{text-align:center;}
 .cell-rec-head{
   font-weight:600; color:var(--muted); letter-spacing:.03em;
+  position:relative; overflow:hidden;
 }
-.rec-spinner{display:inline-block; animation:rec-pulse 1s ease-in-out infinite;}
-@keyframes rec-pulse{0%,100%{opacity:.3;} 50%{opacity:1;}}
-.cell-rec{min-width:0;}
+.cell-rec{min-width:0; position:relative; overflow:hidden;}
 .cell-rec-qty{font-size:12.5px; font-weight:600; color:var(--ink);}
 .cell-rec.met .cell-rec-qty{color:var(--good);}
 .cell-rec-reason{color:var(--muted); font-size:11px; margin-top:1px; line-height:1.35;}
-.cell-rec.pending .cell-rec-reason{font-style:italic;}
+.parts-table.is-recommending .cell-rec-head::after,
+.parts-table.is-recommending .cell-rec::after{
+  content:"";
+  position:absolute; top:0; bottom:0; left:0; width:70%;
+  background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 22%, transparent), transparent);
+  animation:rec-col-sweep 2s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes rec-col-sweep{
+  0%{transform:translateX(-120%); opacity:.3;}
+  45%{opacity:1;}
+  100%{transform:translateX(220%); opacity:.3;}
+}
 .cell-qty .bom-qty .qty-frac{
   font-family:"IBM Plex Mono"; font-size:12px; min-width:16px; text-align:center;
   color:var(--ink);
@@ -554,6 +629,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .product-modal.is-open .product-dialog, .photo-lightbox.is-open figure{
     animation:none; transform:none; opacity:1; transition:none;
   }
+  #resultsPanel.is-searching .table-scroll::before,
+  #extraBlocks.is-searching .table-scroll::before{
+    animation:none; width:100%; transform:none; opacity:.75;
+  }
+  #resultsPanel.is-searching .table-scroll::after,
+  #extraBlocks.is-searching .table-scroll::after{
+    animation:none; opacity:0;
+  }
 }
 
 .bom-summary{padding:11px 14px 13px; border-top:1px solid var(--line);}
@@ -647,7 +730,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .product-open:hover{color:var(--accent-strong); text-decoration-color:currentColor;}
 .product-open:active{opacity:.72;}
 .product-modal{
-  position:fixed; inset:0; z-index:60; display:grid; place-items:center; padding:22px;
+  position:fixed; inset:0; z-index:60; display:grid; justify-items:center; align-items:stretch; padding:0;
 }
 .product-modal[hidden]{
   display:grid !important; opacity:0; visibility:hidden; pointer-events:none;
@@ -659,7 +742,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .product-modal.is-open .product-modal-backdrop{opacity:1;}
 .product-dialog{
-  position:relative; width:min(1040px, 96vw); max-height:min(880px, 94vh);
+  position:relative; width:min(1040px, 100%); height:100%; max-height:none;
   display:flex; flex-direction:column; overflow:hidden;
   background:var(--surface); border:1px solid var(--line-strong);
   box-shadow:0 18px 60px rgba(20,24,28,.34);
@@ -671,18 +754,21 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   animation:border-trace .62s var(--ease) forwards;
 }
 .product-dialog-head{
-  flex:none; display:flex; align-items:flex-start; justify-content:space-between; gap:20px;
-  padding:17px 20px 15px; border-bottom:1px solid var(--line-strong); background:var(--surface-2);
+  flex:none; display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:7px 14px; border-bottom:1px solid var(--line-strong); background:var(--surface-2);
+}
+.product-dialog-titles{
+  display:flex; align-items:baseline; gap:10px; min-width:0; flex-wrap:wrap;
 }
 .product-dialog-head h2{
-  margin:2px 0 3px; font-family:"IBM Plex Mono"; font-size:19px; line-height:1.2;
+  margin:0; font-family:"IBM Plex Mono"; font-size:15px; line-height:1.15;
   overflow-wrap:anywhere;
 }
-.product-kicker{font-size:11.5px; color:var(--muted);}
+.product-kicker{font-size:11px; color:var(--muted);}
 .product-close{
-  flex:none; width:30px; height:30px; display:grid; place-items:center;
+  flex:none; width:24px; height:24px; display:grid; place-items:center;
   border:1px solid var(--line); border-radius:var(--radius-sm);
-  background:var(--surface); color:var(--ink); font-size:18px; line-height:1;
+  background:var(--surface); color:var(--ink); font-size:16px; line-height:1;
   transition:var(--control);
 }
 .product-close:hover{color:var(--bad); border-color:var(--line-strong);}
@@ -758,8 +844,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 body.modal-open{overflow:hidden;}
 @media (max-width:780px){
-  .product-modal{padding:0;}
-  .product-dialog{width:100%; max-height:100vh; height:100vh; border:0;}
+  .product-dialog{width:100%; border:0;}
   .product-hero{grid-template-columns:120px minmax(0,1fr);}
   .buy-card{grid-column:1 / -1;}
   .product-sections{grid-template-columns:1fr;}
@@ -778,16 +863,15 @@ body.modal-open{overflow:hidden;}
 <div class="app" id="app">
 
   <div class="topbar">
-    <div class="brand">
-      <svg class="brand-mark" width="22" height="22" viewBox="0 0 24 24" fill="none">
-        <rect x="7" y="7" width="10" height="10" rx="1" style="stroke:var(--ink);" stroke-width="1.6"/>
-        <path d="M9.5 7V4M14.5 7V4M9.5 20v-3M14.5 20v-3M7 9.5H4M7 14.5H4M20 9.5h-3M20 14.5h-3" style="stroke:var(--ink);" stroke-width="1.6" stroke-linecap="round"/>
-        <circle cx="14.5" cy="9.5" r="1.3" style="fill:var(--accent);"/>
+    <a class="brand" href="/bom-copilot.html" aria-label="DigiSearch home">
+      <svg class="brand-mark" width="42" height="42" viewBox="0 0 42 42" aria-hidden="true">
+        <rect width="42" height="42" rx="7" style="fill:var(--accent);"/>
+        <rect x="13" y="13" width="16" height="16" rx="1.6" style="stroke:#fff; fill:none;" stroke-width="2"/>
+        <path d="M17 13V7.5M21 13V7.5M25 13V7.5M17 34.5V29M21 34.5V29M25 34.5V29M13 17H7.5M13 21H7.5M13 25H7.5M34.5 17H29M34.5 21H29M34.5 25H29" style="stroke:#fff;" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="26" cy="17.5" r="1.7" style="fill:#fff;"/>
       </svg>
-      <span class="brand-name">Partfinder</span>
-      <span class="brand-sep">/</span>
-      <span class="brand-proj">BOM Copilot</span>
-    </div>
+      <span class="brand-name">DigiSearch</span>
+    </a>
 
     <div style="display:flex; align-items:center; gap:8px;">
       <button class="tuner-toggle" onclick="toggleDemoMode()" id="demoToggle" title="Use closest cached searches and LLM recommendations — no live DigiKey or OpenRouter calls">Demo mode</button>
@@ -807,7 +891,7 @@ body.modal-open{overflow:hidden;}
         </div>
 
         <div id="singleMode">
-          <div class="search-box">
+          <div class="search-box" id="searchBox">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
             <input id="queryInput" type="text" placeholder="Describe the part you need" value="10k 0603 1% resistor for a voltage divider, tape and reel" />
             <button class="btn-primary btn-search" onclick="runSearch()">Search</button>
@@ -839,10 +923,9 @@ body.modal-open{overflow:hidden;}
           <button class="linklike why-link" onclick="toggleWhy()" id="whyLink">How was this interpreted?</button>
         </div>
         <div class="why-panel" id="whyPanel" hidden></div>
-        <p class="cache-note" id="cacheNote" hidden></p>
       </div>
 
-      <div class="panel">
+      <div class="panel" id="resultsPanel">
         <div class="results-toolbar">
           <span><strong id="resultCount">5</strong> matches</span>
           <div class="toolbar-controls">
@@ -930,8 +1013,8 @@ body.modal-open{overflow:hidden;}
         <div class="sum-row total"><span>Estimated cost</span><span class="v" id="sumCost">$0.00</span></div>
         <div class="sum-note" id="stockWarn" style="display:none;"></div>
         <div class="bom-actions">
-          <button class="btn-primary" onclick="exportCsv()">Export CSV</button>
-          <button class="linklike" onclick="copyList()">Copy</button>
+          <button class="btn-primary" id="exportBomBtn" onclick="exportBom()">Export Excel</button>
+          <button class="linklike" onclick="copyList()">Copy CSV</button>
         </div>
         <button class="linklike lock-link" onclick="lockQuote()" id="lockBtn">Lock pricing (15 min)</button>
       </div>
@@ -965,9 +1048,9 @@ body.modal-open{overflow:hidden;}
       <rect pathLength="1" rx="0" ry="0"/>
     </svg>
     <header class="product-dialog-head">
-      <div>
-        <div class="product-kicker" id="productModalKicker"></div>
+      <div class="product-dialog-titles">
         <h2 id="productModalTitle"></h2>
+        <div class="product-kicker" id="productModalKicker"></div>
       </div>
       <button class="product-close" onclick="closeProductModal()" aria-label="Close product details">×</button>
     </header>
@@ -1003,6 +1086,10 @@ let currentSortMode = "fit";
 let resultsPage = 0;
 const PAGE_SIZE = 5;
 let pendingRecommendCount = 0;
+function syncRecommendBusy(){
+  const on = pendingRecommendCount > 0;
+  document.querySelectorAll(".parts-table").forEach(el => el.classList.toggle("is-recommending", on));
+}
 let bom = [];
 let bomIdSeq = 1;
 let cart = [];
@@ -1013,6 +1100,11 @@ let colState = { manufacturer: false, moq: true, photo: true, series: false, lea
 
 function allResultRows(){
   return searchBlocks.flatMap(b => b.results || []);
+}
+
+const knownParts = Object.create(null);
+function rememberParts(rows){
+  (rows || []).forEach(r => { if(r && r.dk) knownParts[r.dk] = r; });
 }
 
 function fmtStock(n){
@@ -1030,13 +1122,24 @@ function setQuery(q){
   runSearch();
 }
 
+let searchInFlight = false;
+function setSearchBusy(on){
+  const btn = document.querySelector(".btn-search");
+  btn.disabled = on;
+  btn.setAttribute("aria-busy", on ? "true" : "false");
+  document.getElementById("searchBox").classList.toggle("is-searching", on);
+  document.querySelector(".search-block").classList.toggle("is-searching", on);
+  const results = document.getElementById("resultsPanel");
+  results.classList.toggle("is-searching", on);
+  results.setAttribute("aria-busy", on ? "true" : "false");
+  document.getElementById("extraBlocks").classList.toggle("is-searching", on);
+}
+
 async function runSearch(){
   const q = document.getElementById("queryInput").value.trim();
-  if(!q) return;
-  const btn = document.querySelector(".btn-search");
-  const prevLabel = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = "Searching…";
+  if(!q || searchInFlight) return;
+  searchInFlight = true;
+  setSearchBusy(true);
   try{
     const res = await fetch(`${API_BASE}/api/search`, {
       method: "POST",
@@ -1053,19 +1156,20 @@ async function runSearch(){
     console.error(err);
     showToast("Search failed — is the backend running at " + API_BASE + "?");
   } finally {
-    btn.disabled = false;
-    btn.textContent = prevLabel;
+    searchInFlight = false;
+    setSearchBusy(false);
   }
 }
 
 function applySearchResponse(data){
   searchBlocks = data.blocks || [];
+  searchBlocks.forEach(b => rememberParts(b.results));
   searchRationale = data.rationale || "";
   const primary = searchBlocks[0] || {tags: [], results: [], keywords: ""};
   currentResults = primary.results.slice();
   currentBlockTags = primary.tags || [];
   resultsPage = 0;
-  renderInterp(primary, data.fromCache, data.demo);
+  renderInterp(primary);
   sortResults(currentSortMode);
   renderExtraBlocks();
 
@@ -1080,6 +1184,7 @@ async function fetchRecommendationsForBlock(block, blockIndex){
 
   pendingRecommendCount++;
   renderHeader();
+  syncRecommendBusy();
   try{
     const candidates = block.results.map(r => ({
       dk: r.dk, mpn: r.mpn, mfr: r.mfr, price: r.price, moq: r.moq, stock: r.stock,
@@ -1106,6 +1211,7 @@ async function fetchRecommendationsForBlock(block, blockIndex){
     pendingRecommendCount--;
     if(blockIndex === 0){ renderResults(lastRenderedArr); }
     else { renderExtraBlocks(); }
+    syncRecommendBusy();
   }
 }
 
@@ -1134,44 +1240,12 @@ function goToResultsPage(delta){
   renderResults(lastRenderedArr);
 }
 
-function cacheNoticeText(block, demo){
-  if(!block || !block.fromCache) return "";
-  const source = block.cacheSource || "";
-  if(demo || demoMode){
-    if(block.cacheFresh){
-      return source
-        ? `Demo mode — cached results for ${source}`
-        : "Demo mode — cached results.";
-    }
-    return source
-      ? `Demo mode — closest cached match: ${source}`
-      : "Demo mode — closest cached match.";
-  }
-  if(block.cacheFresh){
-    return source
-      ? `Showing cached results for ${source} (live search skipped).`
-      : "Showing cached results (live search skipped).";
-  }
-  return source
-    ? `Live search failed — showing closest cached match: ${source}`
-    : "Live search failed — showing closest cached match.";
-}
-
-function renderInterp(primary, responseFromCache, demo){
+function renderInterp(primary){
   document.getElementById("filterChips").innerHTML = currentBlockTags.map(t=>`<span class="filter-chip">${t}</span>`).join("");
   const panel = document.getElementById("whyPanel");
   panel.textContent = searchRationale || "No additional interpretation notes for this query.";
   panel.hidden = true;
   document.getElementById("whyLink").textContent = "How was this interpreted?";
-
-  const note = document.getElementById("cacheNote");
-  const block = primary && (primary.fromCache || responseFromCache)
-    ? {fromCache: true, cacheFresh: !!(primary && primary.cacheFresh), cacheSource: (primary && primary.cacheSource) || ""}
-    : primary;
-  const text = cacheNoticeText(block, demo);
-  note.hidden = !text;
-  note.textContent = text;
-  note.classList.toggle("fresh", !!(block && (block.cacheFresh || demo || demoMode)));
 }
 
 function goToExtraBlockPage(blockIndex, delta){
@@ -1195,18 +1269,14 @@ function renderExtraBlocks(){
       ? items.map(r => buildResultRowHtml(r)).join("")
       : `<div class="bom-empty">No matches for this part.</div>`;
     const pagination = paginationHtml(page, totalPages, `goToExtraBlockPage(${blockIndex},-1)`, `goToExtraBlockPage(${blockIndex},1)`);
-    const cacheNote = block.fromCache
-      ? `<div class="cache-note${block.cacheFresh || demoMode ? " fresh" : ""}">${escHtml(cacheNoticeText(block, demoMode))}</div>`
-      : "";
     return `
       <div class="panel">
         <div class="results-toolbar">
           <span>Also detected: <strong>${escHtml(block.keywords)}</strong> — <strong>${results.length}</strong> matches</span>
           <span class="filter-chips">${tags}</span>
         </div>
-        ${cacheNote}
         <div class="table-scroll">
-          <div class="parts-table" style="--cols:${buildColsString()}; min-width:${tableMinWidth()}px;">
+          <div class="parts-table${pendingRecommendCount > 0 ? " is-recommending" : ""}" style="--cols:${buildColsString()}; min-width:${tableMinWidth()}px;">
             <div class="row-head">${buildHeaderCellsHtml()}</div>
             <div>${rows}</div>
           </div>
@@ -1300,7 +1370,7 @@ function buildHeaderCellsHtml(){
   if(colState.risk) cells.push("<div>Risk</div>");
   if(colState.compliance) cells.push("<div>Compliance</div>");
   if(colState.crossref) cells.push("<div>Cross-ref</div>");
-  cells.push(`<div class="cell-rec-head">AI recommendation${pendingRecommendCount > 0 ? ' <span class="rec-spinner" title="Getting AI recommendations…">⋯</span>' : ''}</div>`);
+  cells.push('<div class="cell-rec-head">AI recommendation</div>');
   cells.push('<div class="cell-qty-head">Qty</div>');
   return cells.join("");
 }
@@ -1309,6 +1379,7 @@ function renderHeader(){
   const table = document.getElementById("partsTable");
   table.style.setProperty("--cols", buildColsString());
   table.style.minWidth = tableMinWidth() + "px";
+  table.classList.toggle("is-recommending", pendingRecommendCount > 0);
   document.getElementById("rowHead").innerHTML = buildHeaderCellsHtml();
 }
 
@@ -1373,7 +1444,7 @@ function buildResultRowHtml(r){
     <div class="cell-part${colState.photo ? ' has-photo' : ''}">
       ${photoHtml}
       <div class="part-text">
-        <div class="mpn" title="${escAttr(r.matchNote)}">${r.best ? '<span class="star">★</span>' : ''}<button class="product-open" onclick="openProductModal('${escAttr(r.dk)}')" aria-label="View details for ${escAttr(r.mpn)}">${escHtml(r.mpn)}</button>${r.highlight ? '<span class="ai-pick-badge">AI PICK</span>' : ''}</div>
+        <div class="mpn" title="${escAttr(r.matchNote)}">${r.best ? '<span class="star">★</span>' : ''}<button type="button" class="product-open" data-dk="${escAttr(r.dk)}" aria-label="View details for ${escAttr(r.mpn)}">${escHtml(r.mpn)}</button>${r.highlight ? '<span class="ai-pick-badge">AI PICK</span>' : ''}</div>
         <div class="sub">DK# ${r.dk}${colState.manufacturer ? '' : ' · ' + r.mfr}${linkHtml}</div>
       </div>
     </div>`);
@@ -1405,12 +1476,9 @@ function buildResultRowHtml(r){
   const cartLine = cart.find(c => c.dk === r.dk);
   const cartQty = cartLine ? cartLine.qty : 0;
   const rec = recQtyFor(r);
-  const recReasonText = r.recommendedQty != null
-    ? (r.reason || "AI-recommended quantity")
-    : `Awaiting AI recommendation — showing MOQ`;
-  cells.push(`<div class="cell-rec ${cartQty >= rec && cartQty > 0 ? 'met' : ''} ${r.recommendedQty == null ? 'pending' : ''}">
+  cells.push(`<div class="cell-rec ${cartQty >= rec && cartQty > 0 ? 'met' : ''}${r.recommendedQty == null ? ' pending' : ''}">
     <div class="cell-rec-qty mono">${rec.toLocaleString()}</div>
-    <div class="cell-rec-reason">${escHtml(recReasonText)}</div>
+    ${r.recommendedQty != null ? `<div class="cell-rec-reason">${escHtml(r.reason || "AI-recommended quantity")}</div>` : ""}
   </div>`);
   cells.push(`<div class="cell-qty">
     <div class="bom-qty">
@@ -1423,7 +1491,7 @@ function buildResultRowHtml(r){
   const rowClasses = ["row"];
   if(r.best) rowClasses.push("row-best");
   if(r.highlight) rowClasses.push("row-ai-pick");
-  return `<div class="${rowClasses.join(' ')}"${r.highlight ? ` title="AI pick: ${(r.reason||'').replace(/"/g,'&quot;')}"` : ''}>${cells.join("")}</div>`;
+  return `<div class="${rowClasses.join(' ')}" data-dk="${escAttr(r.dk)}"${r.highlight ? ` title="AI pick: ${(r.reason||'').replace(/"/g,'&quot;')}"` : ''}>${cells.join("")}</div>`;
 }
 
 function renderResults(arr){
@@ -1455,7 +1523,6 @@ function setMode(mode){
   document.getElementById("batchMode").style.display = mode==="batch" ? "" : "none";
   document.getElementById("interpLine").style.display = mode==="single" ? "" : "none";
   document.getElementById("whyPanel").hidden = true;
-  document.getElementById("cacheNote").hidden = mode !== "single" || !document.getElementById("cacheNote").textContent;
 }
 
 async function runBatch(){
@@ -1476,14 +1543,10 @@ async function runBatch(){
     if(!res.ok) throw new Error(`Batch search failed (${res.status})`);
     const data = await res.json();
 
-    let added = 0, unresolved = 0, cached = 0, cachedFresh = 0;
+    let added = 0, unresolved = 0;
     const batchRows = [];
     (data.results || []).forEach(line => {
       if(!line.resolved || !line.best_row){ unresolved++; return; }
-      if(line.fromCache){
-        cached++;
-        if(line.cacheFresh) cachedFresh++;
-      }
       const best = line.best_row;
       batchRows.push(best);
       const existing = bom.find(l => l.dk === best.dk);
@@ -1492,17 +1555,16 @@ async function runBatch(){
       }
       added++;
     });
-    if(batchRows.length) searchBlocks.push({keywords: "Paste BOM", tags: [], results: batchRows});
+    if(batchRows.length){
+      searchBlocks.push({keywords: "Paste BOM", tags: [], results: batchRows});
+      rememberParts(batchRows);
+    }
 
     renderBom();
     if(added) setBomPanelVisible(true);
     let toast = `Resolved ${added} line${added===1?'':'s'}` + (unresolved ? `, ${unresolved} need review` : "");
     if(demoMode && !added){
       toast = "No cached match — run a live search first";
-    } else if(cached){
-      toast += cachedFresh === cached
-        ? `, ${cached} from cache`
-        : `, ${cached} from cache (closest match)`;
     }
     showToast(toast);
   } catch(err){
@@ -1515,7 +1577,8 @@ async function runBatch(){
 }
 
 function findPart(dk){
-  return allResultRows().find(p => p.dk === dk);
+  if(!dk) return null;
+  return knownParts[dk] || allResultRows().find(p => p.dk === dk) || null;
 }
 
 function setResultCartQty(dk, qty){
@@ -1744,9 +1807,9 @@ function renderCart(){
     listEl.innerHTML = '<div class="bom-empty" id="cartEmpty">No parts added yet. Use + on a result above.</div>';
   } else {
     listEl.innerHTML = cart.map(l => `
-      <div class="bom-row" data-dk="${l.dk}">
+      <div class="bom-row" data-dk="${escAttr(l.dk)}">
         <div class="bom-row-main">
-          <div class="mpn mono">${l.mpn}</div>
+          <div class="mpn mono"><button type="button" class="product-open" data-dk="${escAttr(l.dk)}" aria-label="View details for ${escAttr(l.mpn)}">${escHtml(l.mpn)}</button></div>
           <div class="bom-row-meta">${l.mfr} · ${fmtPrice(l.price)}/ea</div>
           <span class="bom-desig">${l.desig}</span>
         </div>
@@ -1777,9 +1840,9 @@ function renderBom(){
     listEl.innerHTML = '<div class="bom-empty" id="bomEmpty">No parts added yet. Search above, then add a result to start the BOM.</div>';
   } else {
     listEl.innerHTML = bom.map(l => `
-      <div class="bom-row" data-dk="${l.dk}">
+      <div class="bom-row" data-dk="${escAttr(l.dk)}">
         <div class="bom-row-main">
-          <div class="mpn mono">${l.mpn}</div>
+          <div class="mpn mono"><button type="button" class="product-open" data-dk="${escAttr(l.dk)}" aria-label="View details for ${escAttr(l.mpn)}">${escHtml(l.mpn)}</button></div>
           <div class="bom-row-meta">${l.mfr} · ${fmtPrice(l.price)}/ea</div>
           <span class="bom-desig">${l.desig}</span>
         </div>
@@ -1816,10 +1879,41 @@ function buildCsv(){
   return rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
 }
 
-function exportCsv(){
+async function exportBom(){
   if(bom.length===0){ showToast("Add parts to the BOM first"); return; }
-  copyList();
-  showToast("BOM copied — paste into a .csv file to save");
+  const btn = document.getElementById("exportBomBtn");
+  const prevLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Exporting…";
+  const lines = bom.map(l => ({
+    desig: l.desig, qty: l.qty, dk: l.dk, mpn: l.mpn, mfr: l.mfr,
+    price: l.price, stock: l.stock, status: l.status,
+    part: findPart(l.dk)
+  }));
+  try{
+    const res = await fetch(`${API_BASE}/api/export-bom`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({lines})
+    });
+    if(!res.ok) throw new Error(`Export failed (${res.status})`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `DigiSearch-BOM-${new Date().toISOString().slice(0,10)}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast("Downloaded Excel BOM (" + bom.length + " line" + (bom.length===1?"":"s") + ")");
+  } catch(err){
+    console.error(err);
+    showToast("Export failed — is the backend running at " + API_BASE + "?");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prevLabel;
+  }
 }
 function copyList(){
   if(bom.length===0){ showToast("Add parts to the BOM first"); return; }
@@ -1906,7 +2000,7 @@ function renderProductModal(){
     : '<div class="product-description">No cross-reference names were returned.</div>';
   const recNote = r.recommendedQty != null
     ? `${escHtml(r.reason || "AI-recommended purchase quantity")}`
-    : `Recommendation pending; using MOQ as the safe default.`;
+    : "";
 
   document.getElementById("productModalKicker").textContent = `${r.mfr || "Unknown manufacturer"} · DigiKey ${r.dk}`;
   document.getElementById("productModalTitle").textContent = r.mpn || r.dk;
@@ -2116,8 +2210,13 @@ document.addEventListener("pointerout", e => {
 });
 document.addEventListener("click", e => {
   const btn = e.target.closest(".part-photo:not(.is-empty)");
-  if(!btn || !btn.dataset.photo) return;
-  openPhotoLightbox(btn.dataset.photo, btn.dataset.caption);
+  if(btn && btn.dataset.photo){
+    openPhotoLightbox(btn.dataset.photo, btn.dataset.caption);
+    return;
+  }
+  if(e.target.closest("a, .qty-step, .bom-remove, .part-photo")) return;
+  const opener = e.target.closest(".product-open[data-dk], .row[data-dk]");
+  if(opener && opener.dataset.dk) openProductModal(opener.dataset.dk);
 });
 document.addEventListener("keydown", e => {
   if(e.key === "Escape"){

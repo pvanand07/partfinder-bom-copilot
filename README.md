@@ -1,4 +1,4 @@
-# Partfinder BOM Copilot
+# DigiSearch
 
 An AI-assisted DigiKey product search and BOM (bill of materials) generator.
 Given a natural-language part description, an LLM extracts parametric search

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
@@ -144,3 +144,19 @@ class Recommendation(BaseModel):
 
 class RecommendResponse(BaseModel):
     recommendations: list[Recommendation]
+
+
+class BomExportLine(BaseModel):
+    desig: str = ""
+    qty: int = 1
+    dk: str = ""
+    mpn: str = ""
+    mfr: str = ""
+    price: float = 0
+    stock: int = 0
+    status: str = ""
+    part: Optional[dict[str, Any]] = None
+
+
+class BomExportRequest(BaseModel):
+    lines: list[BomExportLine]
