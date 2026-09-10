@@ -102,6 +102,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .tuner-toggle:active{transform:scale(0.96);}
 .tuner-toggle .swatch-dot{width:9px; height:9px; border-radius:50%; background:var(--accent); flex:none;}
+.tuner-toggle.active{border-color:var(--warn); color:var(--warn); background:color-mix(in srgb, var(--warn) 10%, var(--surface));}
+
+.demo-banner{
+  margin-bottom:12px; padding:7px 14px; text-align:center;
+  background:color-mix(in srgb, var(--warn) 14%, var(--surface)); border:1px solid var(--warn);
+  border-radius:var(--radius-sm); color:var(--warn); font-size:12px; font-weight:600;
+}
 
 .tuner-panel{
   position:absolute; top:calc(100% + 6px); right:0; z-index:20;
@@ -422,11 +429,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
       <span class="brand-proj">BOM Copilot</span>
     </div>
 
-    <div style="position:relative;">
-      <button class="tuner-toggle" onclick="toggleTuner()"><span class="swatch-dot" id="tunerDot"></span>Colors</button>
-      <div class="tuner-panel hidden" id="tunerPanel"></div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <button class="tuner-toggle" onclick="toggleDemoMode()" id="demoToggle" title="Show cached sample data instead of calling the live backend — for frontend development without API cost">Demo mode</button>
+      <div style="position:relative;">
+        <button class="tuner-toggle" onclick="toggleTuner()"><span class="swatch-dot" id="tunerDot"></span>Colors</button>
+        <div class="tuner-panel hidden" id="tunerPanel"></div>
+      </div>
     </div>
   </div>
+
+  <div class="demo-banner" id="demoBanner" hidden>Demo mode — showing cached sample data, not live DigiKey results</div>
 
   <div class="grid bom-collapsed" id="mainGrid">
     <!-- LEFT: search + results -->
@@ -566,8 +578,50 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 <div class="toast" id="toast"></div>
 
+<script src="demo-data.js"></script>
 <script>
 const API_BASE = "http://localhost:8000";
+
+// Demo mode: replays cached real DigiKey responses (captured live, see demo-data.js)
+// instead of calling the backend — for frontend iteration without API cost or a
+// running backend. Persisted across reloads like the color tuner.
+let demoMode = localStorage.getItem("bom-copilot-demo") === "1";
+
+const DEMO_QUERY_MAP = {
+  "10k 0603 1% resistor for a voltage divider, tape and reel": "demo1",
+  "3.3V 1A buck regulator, small footprint, no external diode": "demo2",
+  "USB-C receptacle, SMD, 16 pin, for power + data": "demo3",
+  "100nF 0402 X7R decoupling cap, 16V+": "demo4",
+  "ESD protection diode array for USB data lines": "demo5",
+};
+
+function demoSearchFor(query){
+  const exactKey = DEMO_QUERY_MAP[query];
+  if(exactKey) return DEMO_DATA[exactKey];
+
+  // No exact match (arbitrary typed query) — fall back to whichever cached
+  // example shares the most words, same heuristic as the old batch-line matcher.
+  const words = query.toLowerCase().split(/[\s,]+/).filter(w => w.length > 2);
+  let bestKey = "demo1", bestScore = -1;
+  for(const [exampleQuery, key] of Object.entries(DEMO_QUERY_MAP)){
+    const exampleLower = exampleQuery.toLowerCase();
+    const score = words.filter(w => exampleLower.includes(w)).length;
+    if(score > bestScore){ bestScore = score; bestKey = key; }
+  }
+  return DEMO_DATA[bestKey];
+}
+
+function setDemoMode(on){
+  demoMode = on;
+  localStorage.setItem("bom-copilot-demo", on ? "1" : "0");
+  document.getElementById("demoToggle").classList.toggle("active", on);
+  document.getElementById("demoBanner").hidden = !on;
+}
+
+function toggleDemoMode(){
+  setDemoMode(!demoMode);
+  showToast(demoMode ? "Demo mode on — showing cached sample data" : "Demo mode off — using the live backend");
+}
 
 let currentResults = [];
 let currentBlockTags = [];
@@ -609,13 +663,19 @@ async function runSearch(){
   btn.disabled = true;
   btn.textContent = "Searching…";
   try{
-    const res = await fetch(`${API_BASE}/api/search`, {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({query: q})
-    });
-    if(!res.ok) throw new Error(`Search failed (${res.status})`);
-    const data = await res.json();
+    let data;
+    if(demoMode){
+      await new Promise(r => setTimeout(r, 250)); // brief fake latency so it still feels like a search
+      data = demoSearchFor(q);
+    } else {
+      const res = await fetch(`${API_BASE}/api/search`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({query: q})
+      });
+      if(!res.ok) throw new Error(`Search failed (${res.status})`);
+      data = await res.json();
+    }
     applySearchResponse(data);
   } catch(err){
     console.error(err);
@@ -944,13 +1004,19 @@ async function runBatch(){
   btn.textContent = "Resolving…";
 
   try{
-    const res = await fetch(`${API_BASE}/api/batch-search`, {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({lines})
-    });
-    if(!res.ok) throw new Error(`Batch search failed (${res.status})`);
-    const data = await res.json();
+    let data;
+    if(demoMode){
+      await new Promise(r => setTimeout(r, 250));
+      data = DEMO_DATA.demo_batch;
+    } else {
+      const res = await fetch(`${API_BASE}/api/batch-search`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({lines})
+      });
+      if(!res.ok) throw new Error(`Batch search failed (${res.status})`);
+      data = await res.json();
+    }
 
     let added = 0, unresolved = 0;
     const batchRows = [];
@@ -1323,10 +1389,18 @@ document.addEventListener("click", e => {
   }
 });
 
+function renderIdleState(){
+  document.getElementById("resultCount").textContent = "0";
+  document.getElementById("addRecQtyBtn").disabled = true;
+  renderHeader();
+  document.getElementById("resultList").innerHTML = `<div class="bom-empty" style="padding:28px 15px;">Type a query above and hit Search to see real DigiKey results.</div>`;
+  document.getElementById("pagination").innerHTML = "";
+}
+
 // initial state
 loadTunerColors();
-renderHeader();
-runSearch();
+setDemoMode(demoMode);
+renderIdleState();
 renderBom();
 renderCart();
 </script>

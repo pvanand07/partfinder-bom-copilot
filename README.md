@@ -97,6 +97,13 @@ server-side in `server/`; the browser never sees them.
   parts.)
 - **Live color tuner** — an in-UI panel (top-right, "Colors") for adjusting
   the design token palette live, with reset-to-default and copy-as-CSS.
+- **Demo mode** — a "Demo mode" toggle (top-right, persisted like the color
+  tuner) replays real DigiKey responses captured earlier and bundled in
+  [static/demo-data.js](static/demo-data.js), instead of calling the live
+  backend. Useful for frontend-only development: no backend/API needed, no
+  DigiKey/OpenRouter quota spent, near-instant response. The page never
+  auto-searches on load in either mode — you always start from an idle
+  state and search explicitly.
 
 ## Status
 
