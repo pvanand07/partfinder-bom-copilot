@@ -91,29 +91,27 @@ def _extract_json(text: str) -> dict:
     return json.loads(text)
 
 
-def _call_llm(user_content: str) -> dict:
+def _call_llm(system_prompt: str, user_content: str, schema: dict, schema_name: str) -> dict:
     client = _client()
     model = os.getenv("OPENROUTER_MODEL")
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_content},
+    ]
 
     try:
         resp = client.chat.completions.create(
             model=model,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_content},
-            ],
+            messages=messages,
             response_format={
                 "type": "json_schema",
-                "json_schema": {"name": "parse_result", "strict": True, "schema": _RESPONSE_SCHEMA},
+                "json_schema": {"name": schema_name, "strict": True, "schema": schema},
             },
         )
     except Exception:
         resp = client.chat.completions.create(
             model=model,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_content},
-            ],
+            messages=messages,
             response_format={"type": "json_object"},
         )
 
@@ -121,7 +119,7 @@ def _call_llm(user_content: str) -> dict:
 
 
 def parse_query(query: str) -> ParseResult:
-    data = _call_llm(f"Query: {query}")
+    data = _call_llm(SYSTEM_PROMPT, f"Query: {query}", _RESPONSE_SCHEMA, "parse_result")
     return ParseResult(**data)
 
 
@@ -131,5 +129,55 @@ def parse_batch(lines: list[str]) -> ParseResult:
         f"The user pasted a {len(lines)}-line BOM, one requested part per line. Produce exactly one "
         f"item in `items` per line below, in the same order (do not merge or split lines):\n{numbered}"
     )
-    data = _call_llm(prompt)
+    data = _call_llm(SYSTEM_PROMPT, prompt, _RESPONSE_SCHEMA, "parse_result")
     return ParseResult(**data)
+
+
+RECOMMEND_SYSTEM_PROMPT = """You are helping an engineer decide what to actually buy, for one part search \
+on an electronics BOM tool. You are given the search context and a shortlist of REAL DigiKey listings \
+that already matched the search — with real price-break tiers, real MOQ, real stock, and how well each \
+one matched the request (matchScore/matchNote). You are NOT searching or ranking from scratch — the \
+list and its order are already decided; you are only adding a purchase quantity and pick opinion on top.
+
+For every candidate, in the same order, decide:
+- `recommendedQty`: a sensible quantity to actually order for THIS specific listing. It must be >= that \
+listing's `moq` — never recommend less than the minimum order quantity. If `priceBreaks` shows a \
+meaningfully cheaper tier within roughly the same order of magnitude as the MOQ (e.g. 2-5x), you may \
+recommend that tier instead of the bare MOQ; do not jump to a wildly larger quantity just to chase a \
+marginally lower unit price.
+- `highlight`: true for the one or two listings you'd genuinely tell the engineer to buy — you may \
+weigh lifecycle risk, stock depth, or price/MOQ tradeoffs differently than the existing match-based \
+order, so `highlight` does not have to line up with which candidate is listed first. false for the rest.
+- `reason`: one short clause (under 12 words) explaining the quantity/highlight choice for that listing.
+
+Respond with ONLY a JSON object matching the schema — one entry in `recommendations` per candidate, \
+same order, referencing each by its `dk`. No prose, no markdown fences.
+"""
+
+_RECOMMEND_ITEM_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "dk": {"type": "string"},
+        "recommendedQty": {"type": "integer"},
+        "highlight": {"type": "boolean"},
+        "reason": {"type": "string"},
+    },
+    "required": ["dk", "recommendedQty", "highlight", "reason"],
+}
+
+_RECOMMEND_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "recommendations": {"type": "array", "items": _RECOMMEND_ITEM_SCHEMA},
+    },
+    "required": ["recommendations"],
+}
+
+
+def recommend_quantities(keywords: str, candidates: list[dict]) -> list[dict]:
+    """Second-pass LLM call: given the already-ranked real DigiKey candidates for one search, decide a
+    purchase quantity and pick highlight per listing. Runs after the deterministic search+ranking, not
+    instead of it — the LLM only ever sees candidates that already exist and are already ordered."""
+    prompt = f"Search: {keywords}\nCandidates:\n{json.dumps(candidates, ensure_ascii=False)}"
+    data = _call_llm(RECOMMEND_SYSTEM_PROMPT, prompt, _RECOMMEND_SCHEMA, "recommend_result")
+    return data["recommendations"]

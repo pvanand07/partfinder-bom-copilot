@@ -104,12 +104,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .tuner-toggle .swatch-dot{width:9px; height:9px; border-radius:50%; background:var(--accent); flex:none;}
 .tuner-toggle.active{border-color:var(--warn); color:var(--warn); background:color-mix(in srgb, var(--warn) 10%, var(--surface));}
 
-.demo-banner{
-  margin-bottom:12px; padding:7px 14px; text-align:center;
-  background:color-mix(in srgb, var(--warn) 14%, var(--surface)); border:1px solid var(--warn);
-  border-radius:var(--radius-sm); color:var(--warn); font-size:12px; font-weight:600;
-}
-
 .tuner-panel{
   position:absolute; top:calc(100% + 6px); right:0; z-index:20;
   width:280px; max-height:min(560px, 80vh); overflow-y:auto;
@@ -143,13 +137,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 /* Layout */
 .grid{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) 292px;
-  gap:16px;
-  align-items:start;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  min-width:0;
 }
-.grid.bom-collapsed{grid-template-columns:minmax(0,1fr);}
-@media (max-width: 900px){ .grid{grid-template-columns:1fr;} }
 
 .panel{
   background:var(--surface);
@@ -280,6 +272,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .row:hover{background:var(--surface-2);}
 .row.row-best{border-left-color:var(--accent);}
+.row.row-ai-pick{background:color-mix(in srgb, var(--good) 7%, transparent);}
+.row.row-ai-pick:hover{background:color-mix(in srgb, var(--good) 13%, transparent);}
+.ai-pick-badge{
+  display:inline-block; font-size:9.5px; font-weight:700; letter-spacing:.03em;
+  color:var(--good); border:1px solid var(--good); border-radius:3px;
+  padding:1px 4px; margin-left:5px; vertical-align:middle;
+}
 
 .cell-part{min-width:0;}
 .cell-part.has-photo{display:flex; gap:10px; align-items:flex-start; min-width:0;}
@@ -288,6 +287,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   border:1px solid var(--line); border-radius:var(--radius-sm);
   background:#f3f4f5; cursor:zoom-in; overflow:hidden;
   display:flex; align-items:center; justify-content:center;
+  font: inherit; color: inherit;
   transition:border-color .16s ease, box-shadow .16s ease;
 }
 .part-photo:hover, .part-photo:focus-visible{
@@ -300,9 +300,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     #eceeef;
   background-size:100% 100%;
 }
+.part-thumb{
+  width:56px; height:56px; object-fit:contain; background:#fff; padding:3px;
+  display:block; flex:none;
+}
 .part-photo .part-thumb{
-  width:100%; height:100%; object-fit:contain; background:#fff; padding:3px;
-  display:block;
+  width:100%; height:100%;
 }
 .cell-part .part-text{min-width:0; flex:1 1 auto;}
 .cell-part .mpn{font-family:"IBM Plex Mono"; font-weight:600; font-size:12.5px;}
@@ -332,10 +335,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .cell-rec-head{
   text-align:center; font-weight:600; color:var(--muted); letter-spacing:.03em;
 }
+.rec-spinner{display:inline-block; animation:rec-pulse 1s ease-in-out infinite;}
+@keyframes rec-pulse{0%,100%{opacity:.3;} 50%{opacity:1;}}
 .cell-rec{
   text-align:center; color:var(--muted); font-size:11.5px; padding-top:2px;
 }
 .cell-rec.met{color:var(--good);}
+.cell-rec.pending{opacity:.5; font-style:italic;}
 .cell-qty .bom-qty .qty-frac{
   font-family:"IBM Plex Mono"; font-size:12px; min-width:16px; text-align:center;
   color:var(--ink);
@@ -355,7 +361,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .about-detail.open{display:block;}
 
 /* BOM panel */
-.bom-panel{position:sticky; top:16px; display:flex; flex-direction:column; max-height:calc(100vh - 32px); box-shadow:var(--shadow-sm);}
+.bom-panel{display:flex; flex-direction:column; box-shadow:var(--shadow-sm);}
 .bom-head{
   padding:12px 14px 10px; border-bottom:1px solid var(--line);
   display:flex; align-items:baseline; justify-content:space-between;
@@ -441,7 +447,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   border-radius:var(--radius-md); box-shadow:0 8px 28px rgba(20,24,28,.22);
   pointer-events:none;
 }
-.photo-flyout[hidden]{display:none;}
+.photo-flyout[hidden], .photo-lightbox[hidden]{display:none !important;}
 .photo-flyout img{
   width:100%; height:100%; object-fit:contain; background:#fff; display:block;
   border-radius:2px;
@@ -451,7 +457,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   position:fixed; inset:0; z-index:50;
   display:flex; align-items:center; justify-content:center; padding:28px;
 }
-.photo-lightbox[hidden]{display:none;}
+.photo-lightbox[hidden]{display:none !important;}
 .photo-lightbox-backdrop{
   position:absolute; inset:0; border:0; padding:0;
   background:rgba(18,22,26,.62); cursor:zoom-out;
@@ -477,6 +483,129 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   display:flex; align-items:center; justify-content:center;
 }
 .photo-lightbox-close:hover{color:var(--bad); border-color:var(--line-strong);}
+
+/* Product dossier */
+.product-open{
+  border:0; padding:0; background:none; color:var(--ink); text-align:left;
+  font:inherit; font-family:"IBM Plex Mono"; font-weight:600;
+  text-decoration:underline; text-decoration-color:transparent; text-underline-offset:3px;
+  transition:color .16s ease, text-decoration-color .16s ease;
+}
+.product-open:hover{color:var(--accent-strong); text-decoration-color:currentColor;}
+.product-modal{
+  position:fixed; inset:0; z-index:60; display:grid; place-items:center; padding:22px;
+}
+.product-modal[hidden]{display:none !important;}
+.product-modal-backdrop{
+  position:absolute; inset:0; border:0; background:rgba(18,22,26,.68); cursor:default;
+}
+.product-dialog{
+  position:relative; width:min(1040px, 96vw); max-height:min(880px, 94vh);
+  display:flex; flex-direction:column; overflow:hidden;
+  background:var(--surface); border:1px solid var(--line-strong);
+  box-shadow:0 18px 60px rgba(20,24,28,.34);
+}
+.product-dialog-head{
+  flex:none; display:flex; align-items:flex-start; justify-content:space-between; gap:20px;
+  padding:17px 20px 15px; border-bottom:1px solid var(--line-strong); background:var(--surface-2);
+}
+.product-dialog-head h2{
+  margin:2px 0 3px; font-family:"IBM Plex Mono"; font-size:19px; line-height:1.2;
+  overflow-wrap:anywhere;
+}
+.product-kicker{font-size:11.5px; color:var(--muted);}
+.product-close{
+  flex:none; width:30px; height:30px; display:grid; place-items:center;
+  border:1px solid var(--line); border-radius:var(--radius-sm);
+  background:var(--surface); color:var(--ink); font-size:18px; line-height:1;
+}
+.product-close:hover{color:var(--bad); border-color:var(--line-strong);}
+.product-dialog-body{min-height:0; overflow-y:auto; padding:18px 20px 22px;}
+.product-hero{
+  display:grid; grid-template-columns:220px minmax(0,1fr) 230px; gap:22px;
+  align-items:start; padding-bottom:18px; border-bottom:1px solid var(--line);
+}
+.product-image{
+  width:100%; aspect-ratio:1; display:grid; place-items:center; overflow:hidden;
+  background:#fff; border:1px solid var(--line);
+}
+.product-image img{width:100%; height:100%; object-fit:contain; padding:12px;}
+.product-image-empty{
+  width:58%; height:58%; display:grid; place-items:center; text-align:center;
+  border:1px dashed var(--line); color:var(--muted); font-size:11.5px;
+}
+.product-summary h3{
+  font-family:"Archivo"; font-size:17px; line-height:1.3; margin:0 0 5px;
+}
+.product-description{color:var(--muted); font-size:13px; margin:0 0 14px;}
+.product-badges{display:flex; flex-wrap:wrap; gap:5px; margin-bottom:14px;}
+.product-badge{
+  display:inline-flex; align-items:center; border:1px solid var(--line);
+  border-radius:3px; padding:2px 6px; background:var(--surface-3); font-size:10.5px;
+}
+.product-badge.good{color:var(--good); border-color:var(--good);}
+.product-badge.warn{color:var(--warn); border-color:var(--warn);}
+.product-badge.bad{color:var(--bad); border-color:var(--bad);}
+.product-match{
+  padding:10px 11px; border-left:3px solid var(--accent); background:var(--surface-3);
+  font-size:12px; color:var(--muted);
+}
+.product-match strong{display:block; color:var(--ink); margin-bottom:2px;}
+.product-links{display:flex; flex-wrap:wrap; gap:12px; margin-top:14px;}
+.product-links a{color:var(--accent-strong); font-weight:600; text-decoration:none;}
+.product-links a:hover{text-decoration:underline;}
+.buy-card{border:1px solid var(--line-strong); background:var(--surface-3);}
+.buy-card-top{padding:13px 14px 11px; border-bottom:1px solid var(--line);}
+.buy-price{font-family:"IBM Plex Mono"; font-size:22px; font-weight:600;}
+.buy-unit{color:var(--muted); font-size:11.5px;}
+.buy-metrics{padding:10px 14px; display:grid; gap:6px;}
+.buy-metric{display:flex; justify-content:space-between; gap:12px; font-size:12px;}
+.buy-metric span:first-child{color:var(--muted);}
+.buy-actions{display:flex; align-items:center; justify-content:space-between; gap:9px; padding:11px 14px 14px;}
+.buy-actions .bom-qty{background:var(--surface);}
+.product-sections{
+  display:grid; grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);
+  gap:18px; margin-top:18px;
+}
+.product-section{border-top:2px solid var(--line-strong); padding-top:9px; min-width:0;}
+.product-section h3{font-family:"Archivo"; font-size:13px; margin:0 0 9px;}
+.product-section.wide{grid-column:1 / -1;}
+.detail-list{display:grid; grid-template-columns:minmax(120px,.7fr) minmax(0,1.3fr); margin:0;}
+.detail-list dt,.detail-list dd{margin:0; padding:6px 0; border-bottom:1px solid var(--line); font-size:12px;}
+.detail-list dt{color:var(--muted); padding-right:12px;}
+.detail-list dd{overflow-wrap:anywhere;}
+.price-table{width:100%; border-collapse:collapse; font-size:12px;}
+.price-table th,.price-table td{padding:6px 7px; border-bottom:1px solid var(--line); text-align:right;}
+.price-table th{color:var(--muted); font-size:10.5px; background:var(--surface-2);}
+.price-table th:first-child,.price-table td:first-child{text-align:left;}
+.name-list{display:flex; flex-wrap:wrap; gap:5px;}
+.name-chip{
+  max-width:100%; padding:3px 6px; border:1px solid var(--line); background:var(--surface-3);
+  font-family:"IBM Plex Mono"; font-size:10.5px; overflow-wrap:anywhere;
+}
+.product-raw{margin-top:7px;}
+.product-raw summary{color:var(--muted); cursor:pointer; font-size:11.5px;}
+.product-raw pre{
+  max-height:240px; overflow:auto; padding:10px; background:var(--ink); color:var(--surface-3);
+  font:10.5px/1.5 "IBM Plex Mono"; white-space:pre-wrap; overflow-wrap:anywhere;
+}
+body.modal-open{overflow:hidden;}
+@media (max-width:780px){
+  .product-modal{padding:0;}
+  .product-dialog{width:100%; max-height:100vh; height:100vh; border:0;}
+  .product-hero{grid-template-columns:120px minmax(0,1fr);}
+  .buy-card{grid-column:1 / -1;}
+  .product-sections{grid-template-columns:1fr;}
+  .product-section.wide{grid-column:auto;}
+}
+@media (max-width:500px){
+  .product-dialog-head,.product-dialog-body{padding-left:14px; padding-right:14px;}
+  .product-hero{grid-template-columns:1fr;}
+  .product-image{max-width:180px;}
+  .detail-list{grid-template-columns:1fr;}
+  .detail-list dt{border-bottom:0; padding-bottom:0;}
+  .detail-list dd{padding-top:2px;}
+}
 </style>
 
 <div class="app" id="app">
@@ -494,7 +623,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     </div>
 
     <div style="display:flex; align-items:center; gap:8px;">
-      <button class="tuner-toggle" onclick="toggleDemoMode()" id="demoToggle" title="Show cached sample data instead of calling the live backend — for frontend development without API cost">Demo mode</button>
+      <button class="tuner-toggle" onclick="toggleDemoMode()" id="demoToggle">Demo mode</button>
       <div style="position:relative;">
         <button class="tuner-toggle" onclick="toggleTuner()"><span class="swatch-dot" id="tunerDot"></span>Colors</button>
         <div class="tuner-panel hidden" id="tunerPanel"></div>
@@ -502,11 +631,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     </div>
   </div>
 
-  <div class="demo-banner" id="demoBanner" hidden>Demo mode — showing cached sample data, not live DigiKey results</div>
-
   <div class="grid bom-collapsed" id="mainGrid">
-    <!-- LEFT: search + results -->
-    <div style="display:flex; flex-direction:column; gap:12px; min-width:0;">
 
       <div class="panel search-block">
         <div class="tabs">
@@ -610,20 +735,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
         </div>
       </div>
 
-      <div class="about-row">
-        <button class="linklike" onclick="toggleAbout()" id="aboutLink">About this data</button>
-        <div class="about-detail" id="aboutDetail">Sample catalog data · endpoints modeled on DigiKey Product Information v4 (KeywordSearch, ProductDetails, Substitutions) and Quote v4</div>
-      </div>
-    </div>
-
-    <!-- RIGHT: BOM (hidden by default — revealed via Checkout or the "Show BOM" link) -->
     <div class="panel bom-panel" id="bomPanel" hidden>
       <div class="bom-head">
         <h2>Bill of Materials</h2>
         <span class="bom-count" id="bomCount">0 lines</span>
       </div>
       <div class="bom-list" id="bomList">
-        <div class="bom-empty" id="bomEmpty">No parts added yet. Search on the left, then add a result to start the BOM.</div>
+        <div class="bom-empty" id="bomEmpty">No parts added yet. Search above, then add a result to start the BOM.</div>
       </div>
       <div class="bom-summary">
         <div class="sum-row"><span>Line items</span><span class="v" id="sumLines">0</span></div>
@@ -637,6 +755,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
         <button class="linklike lock-link" onclick="lockQuote()" id="lockBtn">Lock pricing (15 min)</button>
       </div>
     </div>
+
+    <div class="about-row">
+      <button class="linklike" onclick="toggleAbout()" id="aboutLink">About this data</button>
+      <div class="about-detail" id="aboutDetail">Sample catalog data · endpoints modeled on DigiKey Product Information v4 (KeywordSearch, ProductDetails, Substitutions) and Quote v4</div>
+    </div>
   </div>
 </div>
 
@@ -649,6 +772,19 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     <img id="photoLightboxImg" alt="">
     <figcaption id="photoLightboxCap"></figcaption>
   </figure>
+</div>
+<div class="product-modal" id="productModal" hidden>
+  <button class="product-modal-backdrop" onclick="closeProductModal()" aria-label="Close product details"></button>
+  <section class="product-dialog" role="dialog" aria-modal="true" aria-labelledby="productModalTitle">
+    <header class="product-dialog-head">
+      <div>
+        <div class="product-kicker" id="productModalKicker"></div>
+        <h2 id="productModalTitle"></h2>
+      </div>
+      <button class="product-close" onclick="closeProductModal()" aria-label="Close product details">×</button>
+    </header>
+    <div class="product-dialog-body" id="productModalBody"></div>
+  </section>
 </div>
 
 <script src="demo-data.js"></script>
@@ -688,12 +824,10 @@ function setDemoMode(on){
   demoMode = on;
   localStorage.setItem("bom-copilot-demo", on ? "1" : "0");
   document.getElementById("demoToggle").classList.toggle("active", on);
-  document.getElementById("demoBanner").hidden = !on;
 }
 
 function toggleDemoMode(){
   setDemoMode(!demoMode);
-  showToast(demoMode ? "Demo mode on — showing cached sample data" : "Demo mode off — using the live backend");
 }
 
 let currentResults = [];
@@ -703,6 +837,7 @@ let searchRationale = "";
 let currentSortMode = "fit";
 let resultsPage = 0;
 const PAGE_SIZE = 5;
+let pendingRecommendCount = 0;
 let bom = [];
 let bomIdSeq = 1;
 let cart = [];
@@ -770,6 +905,45 @@ function applySearchResponse(data){
   renderInterp();
   sortResults(currentSortMode);
   renderExtraBlocks();
+
+  // Second pass, fired after the real (deterministic) results are already on screen:
+  // ask the LLM to set a purchase quantity + pick highlight per listing, using the
+  // real MOQ/pricing/stock now available — then refresh just the affected table(s).
+  searchBlocks.forEach((block, i) => fetchRecommendationsForBlock(block, i));
+}
+
+async function fetchRecommendationsForBlock(block, blockIndex){
+  if(demoMode || !block.results || !block.results.length) return;
+
+  pendingRecommendCount++;
+  renderHeader();
+  try{
+    const candidates = block.results.map(r => ({
+      dk: r.dk, mpn: r.mpn, mfr: r.mfr, price: r.price, moq: r.moq, stock: r.stock,
+      matchScore: r.matchScore, matchNote: r.matchNote, lifecycle: r.lifecycle,
+      priceBreaks: r.priceBreaks || [],
+    }));
+    const res = await fetch(`${API_BASE}/api/recommend`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({keywords: block.keywords, candidates}),
+    });
+    if(!res.ok) throw new Error(`Recommend failed (${res.status})`);
+    const data = await res.json();
+    const byDk = {};
+    (data.recommendations || []).forEach(rec => { byDk[rec.dk] = rec; });
+    block.results.forEach(r => {
+      const rec = byDk[r.dk];
+      if(rec){ r.recommendedQty = rec.recommendedQty; r.highlight = rec.highlight; r.reason = rec.reason; }
+    });
+  } catch(err){
+    console.error(err);
+    // Silent failure — rows just keep showing the MOQ fallback (recQtyFor) indefinitely.
+  } finally {
+    pendingRecommendCount--;
+    if(blockIndex === 0){ renderResults(lastRenderedArr); }
+    else { renderExtraBlocks(); }
+  }
 }
 
 // Shared pagination: returns the current page's slice plus the clamped page
@@ -927,7 +1101,7 @@ function buildHeaderCellsHtml(){
   if(colState.risk) cells.push("<div>Risk</div>");
   if(colState.compliance) cells.push("<div>Compliance</div>");
   if(colState.crossref) cells.push("<div>Cross-ref</div>");
-  cells.push('<div class="cell-rec-head">Rec</div>');
+  cells.push(`<div class="cell-rec-head">Rec${pendingRecommendCount > 0 ? ' <span class="rec-spinner" title="Getting AI recommendations…">⋯</span>' : ''}</div>`);
   cells.push('<div class="cell-qty-head">Qty</div>');
   return cells.join("");
 }
@@ -983,7 +1157,11 @@ function buildResultRowHtml(r){
   if(r.datasheetUrl) links.push(`<a class="linklike" href="${r.datasheetUrl}" target="_blank" rel="noopener">Datasheet ↗</a>`);
   if(r.productUrl) links.push(`<a class="linklike" href="${r.productUrl}" target="_blank" rel="noopener">DigiKey ↗</a>`);
   const linkHtml = links.length ? ` · ${links.join(" · ")}` : "";
-  const photoHtml = (colState.photo && r.photoUrl) ? `<img class="part-thumb" src="${r.photoUrl}" alt="" onerror="this.remove()">` : "";
+  const photoHtml = colState.photo
+    ? (r.photoUrl
+        ? `<button type="button" class="part-photo" data-photo="${escAttr(r.photoUrl)}" data-caption="${escAttr(r.mpn)}" aria-label="Preview ${escAttr(r.mpn)}"><img class="part-thumb" src="${escAttr(r.photoUrl)}" alt="" onerror="this.parentNode.classList.add('is-empty');this.parentNode.removeAttribute('data-photo');this.remove()"></button>`
+        : `<span class="part-photo is-empty"></span>`)
+    : "";
 
   const breaks = r.priceBreaks || [];
   const price100 = r.priceAt100 != null ? r.priceAt100 : r.price;
@@ -996,7 +1174,7 @@ function buildResultRowHtml(r){
     <div class="cell-part${colState.photo ? ' has-photo' : ''}">
       ${photoHtml}
       <div class="part-text">
-        <div class="mpn" title="${r.matchNote.replace(/"/g,'&quot;')}">${r.best ? '<span class="star">★</span>' : ''}${r.mpn}</div>
+        <div class="mpn" title="${escAttr(r.matchNote)}">${r.best ? '<span class="star">★</span>' : ''}<button class="product-open" onclick="openProductModal('${escAttr(r.dk)}')" aria-label="View details for ${escAttr(r.mpn)}">${escHtml(r.mpn)}</button>${r.highlight ? '<span class="ai-pick-badge">AI PICK</span>' : ''}</div>
         <div class="sub">DK# ${r.dk}${colState.manufacturer ? '' : ' · ' + r.mfr}${linkHtml}</div>
       </div>
     </div>`);
@@ -1027,9 +1205,11 @@ function buildResultRowHtml(r){
   }
   const cartLine = cart.find(c => c.dk === r.dk);
   const cartQty = cartLine ? cartLine.qty : 0;
-  const rec = recommendedQty(nextDesignators(r));
-  const desig = nextDesignators(r);
-  cells.push(`<div class="cell-rec mono ${cartQty >= rec && cartQty > 0 ? 'met' : ''}" title="Recommended quantity based on designators ${desig}">${rec}</div>`);
+  const rec = recQtyFor(r);
+  const recTitle = r.recommendedQty != null
+    ? (r.reason || "AI-recommended quantity")
+    : `Awaiting AI recommendation — showing MOQ (${r.moq})`;
+  cells.push(`<div class="cell-rec mono ${cartQty >= rec && cartQty > 0 ? 'met' : ''} ${r.recommendedQty == null ? 'pending' : ''}" title="${recTitle.replace(/"/g,'&quot;')}">${rec}</div>`);
   cells.push(`<div class="cell-qty">
     <div class="bom-qty">
       <button class="qty-step" onclick="changeResultCartQty('${r.dk}', -1)" aria-label="Decrease quantity"${cartQty === 0 ? ' disabled' : ''}>−</button>
@@ -1038,7 +1218,10 @@ function buildResultRowHtml(r){
     </div>
   </div>`);
 
-  return `<div class="row ${r.best ? 'row-best' : ''}">${cells.join("")}</div>`;
+  const rowClasses = ["row"];
+  if(r.best) rowClasses.push("row-best");
+  if(r.highlight) rowClasses.push("row-ai-pick");
+  return `<div class="${rowClasses.join(' ')}"${r.highlight ? ` title="AI pick: ${(r.reason||'').replace(/"/g,'&quot;')}"` : ''}>${cells.join("")}</div>`;
 }
 
 function renderResults(arr){
@@ -1157,7 +1340,7 @@ function addAllRecQty(){
   if(!lastRenderedArr.length){ showToast("No results to add"); return; }
   let added = 0;
   lastRenderedArr.forEach(r => {
-    const rec = recommendedQty(nextDesignators(r));
+    const rec = recQtyFor(r);
     const existing = cart.find(l => l.dk === r.dk);
     if(!existing || existing.qty !== rec){
       setResultCartQty(r.dk, rec);
@@ -1169,12 +1352,12 @@ function addAllRecQty(){
   showToast(added ? `Set recommended qty for ${added} part${added === 1 ? "" : "s"}` : "All parts already at recommended qty");
 }
 
-function recommendedQty(desigText){
-  if(!desigText || desigText === "—") return 1;
-  if(desigText.includes(",")) return desigText.split(",").length;
-  const range = desigText.match(/^([A-Za-z]+)(\d+)[–-]([A-Za-z]*)(\d+)$/);
-  if(range) return parseInt(range[4], 10) - parseInt(range[2], 10) + 1;
-  return 1;
+// Recommended quantity: an LLM pass (fetchRecommendations, run after the deterministic
+// search+ranking) sets r.recommendedQty/r.highlight/r.reason per real listing, respecting
+// that listing's actual MOQ and qty-break pricing. Before that pass resolves — or if it
+// fails — fall back to the listing's own MOQ (never below what DigiKey requires you to buy).
+function recQtyFor(r){
+  return r.recommendedQty != null ? r.recommendedQty : Math.max(r.moq || 1, 1);
 }
 
 const DESIG_MAP = {
@@ -1289,7 +1472,7 @@ function renderBom(){
   setBomPanelVisible(bom.length > 0 && !bomUserHidden);
 
   if(bom.length === 0){
-    listEl.innerHTML = '<div class="bom-empty" id="bomEmpty">No parts added yet. Search on the left, then add a result to start the BOM.</div>';
+    listEl.innerHTML = '<div class="bom-empty" id="bomEmpty">No parts added yet. Search above, then add a result to start the BOM.</div>';
   } else {
     listEl.innerHTML = bom.map(l => `
       <div class="bom-row">
@@ -1352,6 +1535,275 @@ function lockQuote(){
   btn.textContent = "Locked until " + new Date(Date.now()+15*60000).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
   showToast("Quote locked — myQuoteId issued, valid 15 min");
 }
+
+function escAttr(s){
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+}
+
+function escHtml(s){
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+function safeExternalUrl(url){
+  if(!url) return "";
+  const value = String(url).trim();
+  if(value.startsWith("//")) return "https:" + value;
+  return /^https?:\/\//i.test(value) ? value : "";
+}
+function valueOrDash(value){
+  return value === null || value === undefined || value === "" ? "—" : escHtml(value);
+}
+function detailRows(rows){
+  return `<dl class="detail-list">${rows.map(([label,value]) =>
+    `<dt>${escHtml(label)}</dt><dd>${value === null || value === undefined || value === "" ? "—" : value}</dd>`
+  ).join("")}</dl>`;
+}
+
+let openProductDk = null;
+let productModalReturnFocus = null;
+
+function productBadges(r){
+  const badges = [];
+  badges.push(`<span class="product-badge ${r.lifecycle === 'Active' ? 'good' : 'warn'}">${escHtml(r.lifecycle || "Lifecycle unknown")}</span>`);
+  badges.push(`<span class="product-badge ${r.rohs ? 'good' : 'bad'}">${r.rohs ? "RoHS compliant" : "RoHS not confirmed"}</span>`);
+  if(r.best) badges.push('<span class="product-badge good">Best ranked match</span>');
+  if(r.highlight) badges.push('<span class="product-badge good">AI purchase pick</span>');
+  riskFlags(r).forEach(flag => badges.push(`<span class="product-badge warn">${escHtml(flag)}</span>`));
+  if(!riskFlags(r).length) badges.push('<span class="product-badge">No flagged purchasing risks</span>');
+  return badges.join("");
+}
+
+function modalLink(url, label){
+  const href = safeExternalUrl(url);
+  return href ? `<a href="${escAttr(href)}" target="_blank" rel="noopener">${escHtml(label)} ↗</a>` : "";
+}
+
+function renderProductModal(){
+  const r = findPart(openProductDk);
+  if(!r){ closeProductModal(); return; }
+
+  const cartLine = cart.find(c => c.dk === r.dk);
+  const cartQty = cartLine ? cartLine.qty : 0;
+  const rec = recQtyFor(r);
+  const photo = safeExternalUrl(r.photoUrl);
+  const links = [
+    modalLink(r.datasheetUrl, "Open datasheet"),
+    modalLink(r.productUrl, "View on DigiKey")
+  ].filter(Boolean).join("");
+  const priceBreaks = r.priceBreaks || [];
+  const pricing = priceBreaks.length
+    ? `<table class="price-table"><thead><tr><th>Quantity</th><th>Unit price</th><th>Extended</th><th>Saving</th></tr></thead><tbody>${priceBreaks.map((b, i) => {
+        const saving = r.price > 0 ? Math.max(0, (1 - b.price / r.price) * 100) : 0;
+        return `<tr><td class="mono">${Number(b.qty).toLocaleString()}</td><td class="mono">${fmtPrice(Number(b.price))}</td><td class="mono">${money(Number(b.qty) * Number(b.price))}</td><td class="mono">${i === 0 || !saving ? "—" : saving.toFixed(1) + "%"}</td></tr>`;
+      }).join("")}</tbody></table>`
+    : '<div class="product-description">No standard pricing tiers were returned for this listing.</div>';
+  const alternates = (r.alts || []).length
+    ? detailRows(r.alts.map(a => [a.mpn, escHtml(a.why)]))
+    : '<div class="product-description">No alternate packaging variations were returned.</div>';
+  const names = (r.otherNames || []).length
+    ? `<div class="name-list">${r.otherNames.map(n => `<span class="name-chip">${escHtml(n)}</span>`).join("")}</div>`
+    : '<div class="product-description">No cross-reference names were returned.</div>';
+  const recNote = r.recommendedQty != null
+    ? `${escHtml(r.reason || "AI-recommended purchase quantity")}`
+    : `Recommendation pending; using MOQ as the safe default.`;
+
+  document.getElementById("productModalKicker").textContent = `${r.mfr || "Unknown manufacturer"} · DigiKey ${r.dk}`;
+  document.getElementById("productModalTitle").textContent = r.mpn || r.dk;
+  document.getElementById("productModalBody").innerHTML = `
+    <div class="product-hero">
+      <div class="product-image">${photo
+        ? `<img src="${escAttr(photo)}" alt="${escAttr(r.mpn)} product photo" onerror="this.parentNode.innerHTML='<div class=&quot;product-image-empty&quot;>Image unavailable</div>'">`
+        : '<div class="product-image-empty">No product image returned</div>'}</div>
+      <div class="product-summary">
+        <h3>${valueOrDash(r.description)}</h3>
+        <p class="product-description">${valueOrDash(r.category)}${r.series ? ` · ${escHtml(r.series)}` : ""}</p>
+        <div class="product-badges">${productBadges(r)}</div>
+        <div class="product-match">
+          <strong>Matched ${Number(r.matchScore || 0)} of ${Number(r.matchTotal || 0)} requested attributes</strong>
+          ${valueOrDash(r.matchNote)}
+        </div>
+        <div class="product-links">${links || '<span class="product-description">No external documents returned.</span>'}</div>
+      </div>
+      <aside class="buy-card">
+        <div class="buy-card-top">
+          <div class="buy-price">${r.price > 0 ? fmtPrice(r.price) : "No price"}</div>
+          <div class="buy-unit">${r.price > 0 ? "per unit at minimum tier" : "Contact DigiKey for pricing"}</div>
+        </div>
+        <div class="buy-metrics">
+          <div class="buy-metric"><span>Available</span><strong class="mono">${Number(r.stock || 0).toLocaleString()}</strong></div>
+          <div class="buy-metric"><span>Minimum order</span><strong class="mono">${Number(r.moq || 1).toLocaleString()}</strong></div>
+          <div class="buy-metric"><span>Qty 100</span><strong class="mono">${r.priceAt100 != null ? money(Number(r.priceAt100) * 100) : "—"}</strong></div>
+          <div class="buy-metric"><span>Recommended</span><strong class="mono">${rec.toLocaleString()}</strong></div>
+        </div>
+        <div class="buy-actions">
+          <div class="bom-qty">
+            <button class="qty-step" onclick="changeModalCartQty(-1)" aria-label="Decrease cart quantity"${cartQty === 0 ? " disabled" : ""}>−</button>
+            <span class="qty-val mono">${cartQty}</span>
+            <button class="qty-step" onclick="changeModalCartQty(1)" aria-label="Increase cart quantity">+</button>
+          </div>
+          <button class="btn-primary" onclick="setModalRecommendedQty()">Add ${rec.toLocaleString()}</button>
+        </div>
+        <div class="buy-unit" style="padding:0 14px 13px;">${recNote}</div>
+      </aside>
+    </div>
+    <div class="product-sections">
+      <section class="product-section">
+        <h3>Technical attributes</h3>
+        ${detailRows(String(r.attrs || "").split(" · ").filter(Boolean).map(part => {
+          const split = part.indexOf(":");
+          return split > -1 ? [part.slice(0, split), escHtml(part.slice(split + 1).trim())] : ["Packaging", escHtml(part)];
+        }))}
+      </section>
+      <section class="product-section">
+        <h3>Supply and listing</h3>
+        ${detailRows([
+          ["DigiKey part number", `<span class="mono">${valueOrDash(r.dk)}</span>`],
+          ["Manufacturer P/N", `<span class="mono">${valueOrDash(r.mpn)}</span>`],
+          ["Manufacturer", valueOrDash(r.mfr)],
+          ["Stock status", valueOrDash(r.status)],
+          ["Lead time", r.leadWeeks !== null && r.leadWeeks !== undefined ? `${escHtml(r.leadWeeks)} weeks` : "—"],
+          ["Manufacturer public qty", r.manufacturerPublicQuantity !== null && r.manufacturerPublicQuantity !== undefined ? Number(r.manufacturerPublicQuantity).toLocaleString() : "—"],
+          ["Marketplace", r.marketplace ? "Yes" : "No"],
+          ["Back orders allowed", r.backOrderNotAllowed ? "No" : "Yes"],
+          ["NCNR", r.ncnr ? "Yes" : "No"],
+          ["Tariff active", r.tariffActive ? "Yes" : "No"]
+        ])}
+      </section>
+      <section class="product-section wide">
+        <h3>Price breaks</h3>
+        ${pricing}
+      </section>
+      <section class="product-section">
+        <h3>Compliance and trade</h3>
+        ${detailRows([
+          ["RoHS", r.rohs ? "Compliant" : "Not confirmed"],
+          ["REACH", valueOrDash(r.reachStatus)],
+          ["Moisture sensitivity", valueOrDash(r.moistureSensitivityLevel)],
+          ["Export classification", `<span class="mono">${valueOrDash(r.exportControlClassNumber)}</span>`],
+          ["HTSUS code", `<span class="mono">${valueOrDash(r.htsusCode)}</span>`],
+          ["Discontinued", r.discontinued ? "Yes" : "No"],
+          ["End of life", r.endOfLife ? "Yes" : "No"]
+        ])}
+      </section>
+      <section class="product-section">
+        <h3>Other packaging</h3>
+        ${alternates}
+      </section>
+      <section class="product-section wide">
+        <h3>Cross-reference names</h3>
+        ${names}
+        <details class="product-raw">
+          <summary>View complete search record</summary>
+          <pre>${escHtml(JSON.stringify(r, null, 2))}</pre>
+        </details>
+      </section>
+    </div>`;
+}
+
+function openProductModal(dk){
+  const r = findPart(dk);
+  if(!r) return;
+  productModalReturnFocus = document.activeElement;
+  openProductDk = dk;
+  renderProductModal();
+  document.getElementById("productModal").hidden = false;
+  document.getElementById("app").inert = true;
+  document.body.classList.add("modal-open");
+  document.querySelector("#productModal .product-close").focus();
+}
+function closeProductModal(){
+  const modal = document.getElementById("productModal");
+  if(modal.hidden) return;
+  modal.hidden = true;
+  document.getElementById("app").inert = false;
+  document.body.classList.remove("modal-open");
+  openProductDk = null;
+  if(productModalReturnFocus && document.contains(productModalReturnFocus)) productModalReturnFocus.focus();
+}
+function changeModalCartQty(delta){
+  if(!openProductDk) return;
+  changeResultCartQty(openProductDk, delta);
+  renderProductModal();
+}
+function setModalRecommendedQty(){
+  const r = findPart(openProductDk);
+  if(!r) return;
+  setResultCartQty(r.dk, recQtyFor(r));
+  renderCart();
+  refreshResults();
+  renderProductModal();
+  showToast(`${r.mpn} set to recommended quantity`);
+}
+
+function photoFlyoutEl(){ return document.getElementById("photoFlyout"); }
+function lightboxOpen(){ return !document.getElementById("photoLightbox").hidden; }
+
+function showPhotoFlyout(anchor, url){
+  if(!url || lightboxOpen()) return;
+  const fly = photoFlyoutEl();
+  const img = fly.querySelector("img");
+  if(img.src !== url) img.src = url;
+  fly.hidden = false;
+  positionPhotoFlyout(anchor);
+}
+function hidePhotoFlyout(){
+  photoFlyoutEl().hidden = true;
+}
+function positionPhotoFlyout(anchor){
+  const fly = photoFlyoutEl();
+  if(fly.hidden) return;
+  const r = anchor.getBoundingClientRect();
+  const size = 240;
+  const gap = 10;
+  let left = r.right + gap;
+  let top = r.top;
+  if(left + size > window.innerWidth - 12) left = r.left - size - gap;
+  if(top + size > window.innerHeight - 12) top = Math.max(12, window.innerHeight - size - 12);
+  if(left < 12) left = 12;
+  fly.style.left = left + "px";
+  fly.style.top = top + "px";
+}
+function openPhotoLightbox(url, caption){
+  if(!url) return;
+  hidePhotoFlyout();
+  document.getElementById("photoLightboxImg").src = url;
+  document.getElementById("photoLightboxCap").textContent = caption || "";
+  document.getElementById("photoLightbox").hidden = false;
+}
+function closePhotoLightbox(){
+  document.getElementById("photoLightbox").hidden = true;
+}
+
+document.addEventListener("pointerover", e => {
+  const btn = e.target.closest(".part-photo:not(.is-empty)");
+  if(!btn || !btn.dataset.photo) return;
+  showPhotoFlyout(btn, btn.dataset.photo);
+});
+document.addEventListener("pointerout", e => {
+  const btn = e.target.closest(".part-photo");
+  if(!btn) return;
+  const next = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest(".part-photo") : null;
+  if(next === btn) return;
+  hidePhotoFlyout();
+});
+document.addEventListener("click", e => {
+  const btn = e.target.closest(".part-photo:not(.is-empty)");
+  if(!btn || !btn.dataset.photo) return;
+  openPhotoLightbox(btn.dataset.photo, btn.dataset.caption);
+});
+document.addEventListener("keydown", e => {
+  if(e.key === "Escape"){
+    if(!document.getElementById("productModal").hidden) closeProductModal();
+    else closePhotoLightbox();
+  }
+  if(e.key === "Tab" && !document.getElementById("productModal").hidden){
+    const focusable = [...document.querySelectorAll('#productModal button:not([disabled]), #productModal a[href], #productModal summary')];
+    if(!focusable.length) return;
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if(e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+    else if(!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+  }
+});
+window.addEventListener("scroll", hidePhotoFlyout, true);
 
 let toastTimer;
 function showToast(msg){

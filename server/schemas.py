@@ -104,3 +104,32 @@ class BatchLineResult(BaseModel):
 
 class BatchSearchResponse(BaseModel):
     results: list[BatchLineResult]
+
+
+class RecommendCandidate(BaseModel):
+    dk: str
+    mpn: str
+    mfr: str
+    price: float
+    moq: int
+    stock: int
+    matchScore: int
+    matchNote: str
+    lifecycle: str
+    priceBreaks: list[PriceBreak] = []
+
+
+class RecommendRequest(BaseModel):
+    keywords: str
+    candidates: list[RecommendCandidate]
+
+
+class Recommendation(BaseModel):
+    dk: str
+    recommendedQty: int
+    highlight: bool
+    reason: str
+
+
+class RecommendResponse(BaseModel):
+    recommendations: list[Recommendation]

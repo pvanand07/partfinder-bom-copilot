@@ -14,6 +14,9 @@ from server.schemas import (
     BatchSearchRequest,
     BatchSearchResponse,
     ParsedItem,
+    Recommendation,
+    RecommendRequest,
+    RecommendResponse,
     ResultBlock,
     SearchRequest,
     SearchResponse,
@@ -99,6 +102,34 @@ def batch_search(req: BatchSearchRequest):
         results.append(BatchLineResult(line=line, qty=item.qty, resolved=best_row is not None, best_row=best_row))
 
     return BatchSearchResponse(results=results)
+
+
+@app.post("/api/recommend", response_model=RecommendResponse)
+def recommend(req: RecommendRequest):
+    if not req.candidates:
+        return RecommendResponse(recommendations=[])
+
+    candidates = [c.model_dump() for c in req.candidates]
+    try:
+        raw = nl_parser.recommend_quantities(req.keywords, candidates)
+    except Exception as exc:
+        logger.exception("nl_parser.recommend_quantities failed")
+        raise HTTPException(status_code=502, detail=f"Recommendation failed: {exc}") from exc
+
+    by_dk = {r["dk"]: r for r in raw if "dk" in r}
+    recommendations = []
+    for c in req.candidates:
+        r = by_dk.get(c.dk)
+        if r:
+            recommendations.append(Recommendation(
+                dk=c.dk, recommendedQty=r.get("recommendedQty", c.moq),
+                highlight=bool(r.get("highlight")), reason=r.get("reason", ""),
+            ))
+        else:
+            # LLM dropped or renamed this candidate — fall back to a safe MOQ-based default
+            recommendations.append(Recommendation(dk=c.dk, recommendedQty=c.moq, highlight=False, reason=""))
+
+    return RecommendResponse(recommendations=recommendations)
 
 
 @app.get("/api/health")
