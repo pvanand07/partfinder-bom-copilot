@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from io import BytesIO
+import re
 from typing import Any
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -62,15 +64,15 @@ LEFT_WRAP = Alignment(horizontal="left", vertical="center", wrap_text=True)
 RIGHT = Alignment(horizontal="right", vertical="center")
 
 # Procurement-only: identity + qty + money. Catalog fields live on Part Details.
+# Excel table column names cannot contain / \ * ? : [ ]
 BOM_HEADERS = [
-    "Item", "Designator", "Qty", "Manufacturer", "MPN", "DigiKey P/N",
-    "Description", "Unit Price", "Ext. Price",
+    "Item", "Designator", "Qty", "Manufacturer", "MPN", "DigiKey PN",
+    "Description", "Unit Price", "Ext Price",
 ]
 BOM_WIDTHS = [8, 16, 10, 22, 24, 28, 44, 13, 14]
-BOM_TOTALS = {1: "label", 3: "sum", 9: "sum"}
 
 DETAIL_HEADERS = [
-    "Item", "Designator", "Qty", "Manufacturer", "MPN", "DigiKey P/N",
+    "Item", "Designator", "Qty", "Manufacturer", "MPN", "DigiKey PN",
     "Description", "Category", "Series", "Specs", "Stock", "Status",
     "Unit Price", "MOQ", "Price at 100", "Lifecycle", "RoHS", "REACH", "MSL",
     "ECCN", "HTSUS", "Lead weeks", "Discontinued", "End of life", "NCNR",
@@ -87,7 +89,8 @@ DETAIL_WIDTHS = [
 
 
 def _cell(ws, row, col, value, *, font=FONT_BODY, fill=None, align=LEFT, num_fmt=None, border=True):
-    cell = ws.cell(row, col, value)
+    cell = ws.cell(row, col)
+    cell.value = "" if value is None else value
     cell.font = font
     cell.alignment = align
     cell.fill = fill if fill is not None else FILL_PAPER
@@ -98,70 +101,41 @@ def _cell(ws, row, col, value, *, font=FONT_BODY, fill=None, align=LEFT, num_fmt
     return cell
 
 
-def _fill_row(ws, row, cols, fill):
-    for c in range(1, cols + 1):
-        cell = ws.cell(row, c)
-        cell.fill = fill
-        cell.border = Border()
+def _banner_line(ws, row, cols, value, font, fill, height, *, rule=False):
+    ws.row_dimensions[row].height = height
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=cols)
+    cell = ws.cell(row, 1, value)
+    cell.font = font
+    cell.fill = fill
+    cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    if rule:
+        cell.border = RULE
+    return cell
 
 
 def _banner(ws, cols: int, title: str, subtitle: str, meta: str) -> None:
-    ws.row_dimensions[1].height = 18
-    ws.row_dimensions[2].height = 28
-    ws.row_dimensions[3].height = 18
-    ws.row_dimensions[4].height = 18
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=cols)
-    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=cols)
-    ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=cols)
-    ws.merge_cells(start_row=4, start_column=1, end_row=4, end_column=cols)
-    _fill_row(ws, 1, cols, FILL_COPPER)
-    bar = ws.cell(1, 1, "DigiSearch")
-    bar.font = FONT_MARK
-    bar.fill = FILL_COPPER
-    bar.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    title_cell = ws.cell(2, 1, title)
-    title_cell.font = FONT_TITLE
-    title_cell.fill = FILL_PAPER
-    title_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    sub_cell = ws.cell(3, 1, subtitle)
-    sub_cell.font = FONT_SUB
-    sub_cell.fill = FILL_PAPER
-    sub_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    meta_cell = ws.cell(4, 1, meta)
-    meta_cell.font = FONT_META
-    meta_cell.fill = FILL_PAPER
-    meta_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    for c in range(1, cols + 1):
-        ws.cell(4, c).border = RULE
-        if c > 1:
-            ws.cell(2, c).fill = FILL_PAPER
-            ws.cell(3, c).fill = FILL_PAPER
-            ws.cell(4, c).fill = FILL_PAPER
+    _banner_line(ws, 1, cols, "DigiSearch", FONT_MARK, FILL_COPPER, 18)
+    _banner_line(ws, 2, cols, title, FONT_TITLE, FILL_PAPER, 28)
+    _banner_line(ws, 3, cols, subtitle, FONT_SUB, FILL_PAPER, 18)
+    _banner_line(ws, 4, cols, meta, FONT_META, FILL_PAPER, 18, rule=True)
 
 
-def _add_table(ws, name: str, headers: list[str], header_row: int, last_row: int, totals: dict[int, str] | None = None) -> None:
-    columns = []
-    for i, header in enumerate(headers, start=1):
-        col = TableColumn(id=i, name=header)
-        if totals:
-            if totals.get(i) == "label":
-                col.totalsRowLabel = "Total"
-            elif totals.get(i) == "sum":
-                col.totalsRowFunction = "sum"
-        columns.append(col)
+def _add_table(ws, name: str, headers: list[str], header_row: int, last_row: int, *, last_column=False) -> None:
+    columns = [TableColumn(id=i, name=header) for i, header in enumerate(headers, start=1)]
     last_col = get_column_letter(len(headers))
-    filter_end = last_row - 1 if totals else last_row
+    ref = f"A{header_row}:{last_col}{last_row}"
     table = Table(
         displayName=name,
-        ref=f"A{header_row}:{last_col}{last_row}",
+        name=name,
+        ref=ref,
         headerRowCount=1,
-        totalsRowCount=1 if totals else 0,
+        totalsRowCount=0,
         tableColumns=columns,
-        autoFilter=AutoFilter(ref=f"A{header_row}:{last_col}{filter_end}"),
+        autoFilter=AutoFilter(ref=ref),
         tableStyleInfo=TableStyleInfo(
             name="TableStyleLight8",
             showFirstColumn=False,
-            showLastColumn=bool(totals),
+            showLastColumn=last_column,
             showRowStripes=True,
             showColumnStripes=False,
         ),
@@ -211,6 +185,20 @@ def _yes_no(value: Any) -> str:
     return ""
 
 
+def _sanitize_xlsx(data: bytes) -> bytes:
+    """Drop empty cached formula values that make Excel show a repair prompt."""
+    src = ZipFile(BytesIO(data), "r")
+    out = BytesIO()
+    with ZipFile(out, "w", ZIP_DEFLATED) as dst:
+        for name in src.namelist():
+            payload = src.read(name)
+            if name.startswith("xl/worksheets/sheet") and name.endswith(".xml"):
+                payload = re.sub(rb"<f>([^<]*)</f><v></v>", rb"<f>\1</f>", payload)
+            dst.writestr(name, payload)
+    src.close()
+    return out.getvalue()
+
+
 def build_bom_workbook(lines: list[dict]) -> bytes:
     now = datetime.now().astimezone()
     stamp = now.strftime("%Y-%m-%d %H:%M")
@@ -225,7 +213,7 @@ def build_bom_workbook(lines: list[dict]) -> bytes:
 
     buf = BytesIO()
     wb.save(buf)
-    return buf.getvalue()
+    return _sanitize_xlsx(buf.getvalue())
 
 
 def _write_bom_sheet(ws, lines: list[dict], stamp: str, units: int, cost: float) -> None:
@@ -244,7 +232,6 @@ def _write_bom_sheet(ws, lines: list[dict], stamp: str, units: int, cost: float)
     first_data = header_row + 1
     last_data = header_row + max(len(lines), 1)
     total_row = last_data + 1
-    _fill_row(ws, 5, cols, FILL_PAPER)
 
     for i, (title, width) in enumerate(zip(BOM_HEADERS, BOM_WIDTHS), start=1):
         _cell(ws, header_row, i, title, font=FONT_HEAD, fill=FILL_HEAD, align=CENTER)
@@ -273,19 +260,24 @@ def _write_bom_sheet(ws, lines: list[dict], stamp: str, units: int, cost: float)
         for col, (val, font, align, fmt) in enumerate(values, start=1):
             _cell(ws, row, col, val, font=font, fill=fill, align=align, num_fmt=fmt)
 
+    _add_table(ws, "BOMLines", BOM_HEADERS, header_row, last_data, last_column=True)
+
     ws.row_dimensions[total_row].height = 20
     for col in range(1, cols + 1):
-        _cell(ws, total_row, col, None, font=FONT_TOTAL, fill=FILL_TOTAL, align=LEFT)
-    if lines:
-        _cell(ws, total_row, 1, "Total", font=FONT_TOTAL, fill=FILL_TOTAL, align=LEFT)
-        _cell(ws, total_row, 3, f"=SUM(C{first_data}:C{last_data})", font=FONT_TOTAL, fill=FILL_TOTAL, align=CENTER, num_fmt="0")
-        _cell(ws, total_row, 9, f"=SUM(I{first_data}:I{last_data})", font=FONT_TOTAL, fill=FILL_TOTAL, align=RIGHT, num_fmt='"$"#,##0.00')
-    else:
-        _cell(ws, total_row, 1, "Total", font=FONT_TOTAL, fill=FILL_TOTAL, align=LEFT)
-        _cell(ws, total_row, 3, 0, font=FONT_TOTAL, fill=FILL_TOTAL, align=CENTER, num_fmt="0")
-        _cell(ws, total_row, 9, 0, font=FONT_TOTAL, fill=FILL_TOTAL, align=RIGHT, num_fmt='"$"#,##0.00')
-
-    _add_table(ws, "BOMLines", BOM_HEADERS, header_row, total_row, BOM_TOTALS)
+        if col in (1, 3, 9):
+            continue
+        _cell(ws, total_row, col, "", font=FONT_TOTAL, fill=FILL_TOTAL, align=LEFT)
+    _cell(ws, total_row, 1, "Total", font=FONT_TOTAL, fill=FILL_TOTAL, align=LEFT)
+    _cell(
+        ws, total_row, 3,
+        f"=SUM(C{first_data}:C{last_data})" if lines else 0,
+        font=FONT_TOTAL, fill=FILL_TOTAL, align=CENTER, num_fmt="0",
+    )
+    _cell(
+        ws, total_row, 9,
+        f"=SUM(I{first_data}:I{last_data})" if lines else 0,
+        font=FONT_TOTAL, fill=FILL_TOTAL, align=RIGHT, num_fmt='"$"#,##0.00',
+    )
 
     note_row = total_row + 2
     ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=cols)
@@ -296,7 +288,7 @@ def _write_bom_sheet(ws, lines: list[dict], stamp: str, units: int, cost: float)
 
     ws.freeze_panes = f"A{first_data}"
     ws.print_area = f"A1:{get_column_letter(cols)}{note_row}"
-    _print_setup(ws, "1:6", "Bill of Materials")
+    _print_setup(ws, "1:5", "Bill of Materials")
 
 
 def _write_details_sheet(ws, lines: list[dict], stamp: str) -> None:
@@ -313,7 +305,6 @@ def _write_details_sheet(ws, lines: list[dict], stamp: str) -> None:
     header_row = 6
     first_data = header_row + 1
     last_data = header_row + max(len(lines), 1)
-    _fill_row(ws, 5, cols, FILL_PAPER)
 
     for i, (title, width) in enumerate(zip(DETAIL_HEADERS, DETAIL_WIDTHS), start=1):
         _cell(ws, header_row, i, title, font=FONT_HEAD, fill=FILL_HEAD, align=CENTER_WRAP)
@@ -396,4 +387,4 @@ def _write_details_sheet(ws, lines: list[dict], stamp: str) -> None:
     _add_table(ws, "PartDetails", DETAIL_HEADERS, header_row, last_data)
     ws.freeze_panes = f"C{first_data}"
     ws.print_area = f"A1:{get_column_letter(cols)}{last_data}"
-    _print_setup(ws, "1:6", "Part Details", tabloid=True)
+    _print_setup(ws, "1:5", "Part Details", tabloid=True)
