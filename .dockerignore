@@ -1,0 +1,17 @@
+.git
+.claude
+.cursor
+__pycache__
+*.pyc
+*.pyo
+.env
+.env.*
+legacy
+reference
+__MACOSX
+*.zip
+.DS_Store
+Thumbs.db
+*.md
+docs
+scripts

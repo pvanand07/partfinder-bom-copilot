@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -6,6 +7,8 @@ load_dotenv()
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from server import nl_parser, ranking
 from server.digikey_client import DigikeyClient, DigikeyError
@@ -135,3 +138,14 @@ def recommend(req: RecommendRequest):
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+
+
+@app.get("/")
+def index():
+    return RedirectResponse(url="/bom-copilot.html")
+
+
+app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

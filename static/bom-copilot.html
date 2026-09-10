@@ -349,9 +349,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .qty-frac{color:var(--muted); font-size:11.5px;}
 .qty-frac.met{color:var(--good);}
 
-.cart-panel{margin-top:0;}
-.cart-panel[hidden], .bom-panel[hidden]{display:none !important;}
-
 .about-row{text-align:center; padding-top:2px;}
 .about-row .linklike{font-size:10.5px;}
 .about-detail{
@@ -360,16 +357,42 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .about-detail.open{display:block;}
 
-/* BOM panel */
-.bom-panel{display:flex; flex-direction:column; box-shadow:var(--shadow-sm);}
-.bom-head{
-  padding:12px 14px 10px; border-bottom:1px solid var(--line);
-  display:flex; align-items:baseline; justify-content:space-between;
+/* Checkout / BOM split */
+.checkout-dock{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:18px;
+  align-items:start;
 }
+.checkout-dock:not(:has(.panel:not([hidden]))){display:none;}
+.cart-panel, .bom-panel{
+  display:flex; flex-direction:column; min-width:0; width:100%;
+  box-shadow:var(--shadow-sm);
+}
+.cart-panel{grid-column:1; background:var(--surface-3); border-color:var(--line);}
+.bom-panel{grid-column:2; background:var(--surface); border-color:var(--line-strong);}
+.cart-panel[hidden], .bom-panel[hidden]{display:none !important;}
+.checkout-dock:not(:has(#bomPanel:not([hidden]))) .cart-panel{
+  max-width:480px; justify-self:start;
+}
+.checkout-dock:not(:has(#cartPanel:not([hidden]))) .bom-panel{
+  max-width:480px; justify-self:end;
+}
+.bom-head{
+  padding:11px 14px 10px; border-bottom:1px solid var(--line);
+  display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+}
+.cart-panel .bom-head{background:var(--surface); border-bottom-color:var(--line);}
+.bom-panel .bom-head{background:var(--surface-2); border-bottom-color:var(--line-strong);}
 .bom-head h2{font-family:"Archivo"; font-size:14px; font-weight:700; margin:0;}
+.bom-head-meta{display:flex; align-items:baseline; gap:10px; flex:none;}
 .bom-count{font-size:11.5px; color:var(--muted);}
-.bom-list{overflow-y:auto; flex:1; min-height:70px;}
+.bom-list{overflow-y:auto; flex:1; min-height:70px; max-height:min(360px, 46vh);}
 .bom-empty{padding:22px 14px; text-align:center; color:var(--muted); font-size:12px;}
+@media (max-width:720px){
+  .checkout-dock{grid-template-columns:1fr;}
+  .cart-panel, .bom-panel{grid-column:auto; max-width:none; justify-self:stretch;}
+}
 .bom-row{
   padding:9px 14px; border-bottom:1px solid var(--line);
   display:flex; gap:8px; align-items:flex-start;
@@ -716,12 +739,16 @@ body.modal-open{overflow:hidden;}
 
       <div id="extraBlocks"></div>
 
+      <div class="checkout-dock" id="checkoutDock">
       <div class="panel cart-panel" id="cartPanel" hidden>
         <div class="bom-head">
-          <span><h2 style="display:inline;">Cart</h2> <span class="bom-count" id="cartCount">0 lines</span></span>
-          <button class="linklike" onclick="toggleBomPanel()" id="bomToggleLink" hidden>Show BOM</button>
+          <h2>Cart</h2>
+          <div class="bom-head-meta">
+            <span class="bom-count" id="cartCount">0 lines</span>
+            <button class="linklike" onclick="toggleBomPanel()" id="bomToggleLink" hidden>Show BOM</button>
+          </div>
         </div>
-        <div class="bom-list" id="cartList" style="max-height:none; overflow-y:visible;">
+        <div class="bom-list" id="cartList">
           <div class="bom-empty" id="cartEmpty">No parts added yet. Use + on a result above.</div>
         </div>
         <div class="bom-summary">
@@ -738,7 +765,10 @@ body.modal-open{overflow:hidden;}
     <div class="panel bom-panel" id="bomPanel" hidden>
       <div class="bom-head">
         <h2>Bill of Materials</h2>
-        <span class="bom-count" id="bomCount">0 lines</span>
+        <div class="bom-head-meta">
+          <span class="bom-count" id="bomCount">0 lines</span>
+          <button class="linklike" onclick="toggleBomPanel()">Hide</button>
+        </div>
       </div>
       <div class="bom-list" id="bomList">
         <div class="bom-empty" id="bomEmpty">No parts added yet. Search above, then add a result to start the BOM.</div>
@@ -755,6 +785,7 @@ body.modal-open{overflow:hidden;}
         <button class="linklike lock-link" onclick="lockQuote()" id="lockBtn">Lock pricing (15 min)</button>
       </div>
     </div>
+      </div>
 
     <div class="about-row">
       <button class="linklike" onclick="toggleAbout()" id="aboutLink">About this data</button>
@@ -789,7 +820,9 @@ body.modal-open{overflow:hidden;}
 
 <script src="demo-data.js"></script>
 <script>
-const API_BASE = "http://localhost:8000";
+const API_BASE = (location.port === "8080" || location.protocol === "file:")
+  ? "http://localhost:8000"
+  : "";
 
 // Demo mode: replays cached real DigiKey responses (captured live, see demo-data.js)
 // instead of calling the backend — for frontend iteration without API cost or a
@@ -1430,8 +1463,8 @@ function setBomPanelVisible(show){
   document.getElementById("bomPanel").hidden = !visible;
   document.getElementById("mainGrid").classList.toggle("bom-collapsed", !visible);
   const toggle = document.getElementById("bomToggleLink");
-  toggle.hidden = !populated;
-  toggle.textContent = visible ? "Hide BOM" : "Show BOM";
+  toggle.hidden = !populated || visible;
+  toggle.textContent = "Show BOM";
 }
 
 function toggleBomPanel(){

@@ -4,3 +4,5 @@ Thumbs.db
 reference/
 __pycache__/
 *.pyc
+legacy/
+
