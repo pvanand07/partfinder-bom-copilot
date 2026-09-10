@@ -5,4 +5,5 @@ reference/
 __pycache__/
 *.pyc
 legacy/
+data/
 

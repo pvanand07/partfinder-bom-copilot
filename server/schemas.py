@@ -80,19 +80,26 @@ class ResultBlock(BaseModel):
     tags: list[str]
     matchTotal: int
     results: list[ResultRow]
+    fromCache: bool = False
+    cacheSource: Optional[str] = None
+    cacheFresh: bool = False
 
 
 class SearchRequest(BaseModel):
     query: str
+    demo: bool = False
 
 
 class SearchResponse(BaseModel):
     rationale: str
     blocks: list[ResultBlock]
+    fromCache: bool = False
+    demo: bool = False
 
 
 class BatchSearchRequest(BaseModel):
     lines: list[str]
+    demo: bool = False
 
 
 class BatchLineResult(BaseModel):
@@ -100,6 +107,9 @@ class BatchLineResult(BaseModel):
     qty: int
     resolved: bool
     best_row: Optional[ResultRow] = None
+    fromCache: bool = False
+    cacheSource: Optional[str] = None
+    cacheFresh: bool = False
 
 
 class BatchSearchResponse(BaseModel):
@@ -122,6 +132,7 @@ class RecommendCandidate(BaseModel):
 class RecommendRequest(BaseModel):
     keywords: str
     candidates: list[RecommendCandidate]
+    demo: bool = False
 
 
 class Recommendation(BaseModel):
