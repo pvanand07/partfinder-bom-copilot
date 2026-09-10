@@ -243,6 +243,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .why-panel[hidden]{display:none;}
 .why-panel:not([hidden]){animation:panel-content-in var(--dur-ui) var(--ease-out) both;}
+.cache-note{
+  margin-top:7px; font-size:12px; color:var(--warn); max-width:70ch;
+}
+.cache-note.fresh{color:var(--muted);}
+.cache-note[hidden]{display:none !important;}
+.panel > .cache-note{display:block; padding:0 15px 8px; margin-top:0;}
 
 /* Results */
 .results-toolbar{
@@ -301,6 +307,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   transition:background var(--dur-ui) var(--ease), border-color var(--dur-ui) var(--ease);
 }
 .row:hover{background:var(--surface-2);}
+.row[data-dk]{cursor:pointer;}
 .row.row-best{border-left-color:var(--accent);}
 .row.row-ai-pick{background:color-mix(in srgb, var(--good) 7%, transparent);}
 .row.row-ai-pick:hover{background:color-mix(in srgb, var(--good) 13%, transparent);}
@@ -486,6 +493,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .bom-row .mpn{
   font-family:"IBM Plex Mono"; font-weight:600; font-size:11.5px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.bom-row .mpn .product-open{
+  display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 .bom-row-meta{font-size:10.5px; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .bom-desig{font-family:"IBM Plex Mono"; font-size:10px; color:var(--muted); margin-top:2px; display:block;}
@@ -780,7 +790,7 @@ body.modal-open{overflow:hidden;}
     </div>
 
     <div style="display:flex; align-items:center; gap:8px;">
-      <button class="tuner-toggle" onclick="toggleDemoMode()" id="demoToggle">Demo mode</button>
+      <button class="tuner-toggle" onclick="toggleDemoMode()" id="demoToggle" title="Use closest cached searches and LLM recommendations — no live DigiKey or OpenRouter calls">Demo mode</button>
       <div style="position:relative;">
         <button class="tuner-toggle" onclick="toggleTuner()"><span class="swatch-dot" id="tunerDot"></span>Colors</button>
         <div class="tuner-panel hidden" id="tunerPanel"></div>
@@ -829,6 +839,7 @@ body.modal-open{overflow:hidden;}
           <button class="linklike why-link" onclick="toggleWhy()" id="whyLink">How was this interpreted?</button>
         </div>
         <div class="why-panel" id="whyPanel" hidden></div>
+        <p class="cache-note" id="cacheNote" hidden></p>
       </div>
 
       <div class="panel">
@@ -964,40 +975,15 @@ body.modal-open{overflow:hidden;}
   </section>
 </div>
 
-<script src="demo-data.js"></script>
 <script>
 const API_BASE = (location.port === "8080" || location.protocol === "file:")
   ? "http://localhost:8000"
   : "";
 
-// Demo mode: replays cached real DigiKey responses (captured live, see demo-data.js)
-// instead of calling the backend — for frontend iteration without API cost or a
-// running backend. Persisted across reloads like the color tuner.
+// Demo mode: asks the backend for cache-only closest matches (search + LLM
+// recommendations) instead of calling DigiKey or OpenRouter. Persisted across
+// reloads like the color tuner.
 let demoMode = localStorage.getItem("bom-copilot-demo") === "1";
-
-const DEMO_QUERY_MAP = {
-  "10k 0603 1% resistor for a voltage divider, tape and reel": "demo1",
-  "3.3V 1A buck regulator, small footprint, no external diode": "demo2",
-  "USB-C receptacle, SMD, 16 pin, for power + data": "demo3",
-  "100nF 0402 X7R decoupling cap, 16V+": "demo4",
-  "ESD protection diode array for USB data lines": "demo5",
-};
-
-function demoSearchFor(query){
-  const exactKey = DEMO_QUERY_MAP[query];
-  if(exactKey) return DEMO_DATA[exactKey];
-
-  // No exact match (arbitrary typed query) — fall back to whichever cached
-  // example shares the most words, same heuristic as the old batch-line matcher.
-  const words = query.toLowerCase().split(/[\s,]+/).filter(w => w.length > 2);
-  let bestKey = "demo1", bestScore = -1;
-  for(const [exampleQuery, key] of Object.entries(DEMO_QUERY_MAP)){
-    const exampleLower = exampleQuery.toLowerCase();
-    const score = words.filter(w => exampleLower.includes(w)).length;
-    if(score > bestScore){ bestScore = score; bestKey = key; }
-  }
-  return DEMO_DATA[bestKey];
-}
 
 function setDemoMode(on){
   demoMode = on;
@@ -1052,20 +1038,17 @@ async function runSearch(){
   btn.disabled = true;
   btn.textContent = "Searching…";
   try{
-    let data;
-    if(demoMode){
-      await new Promise(r => setTimeout(r, 250)); // brief fake latency so it still feels like a search
-      data = demoSearchFor(q);
-    } else {
-      const res = await fetch(`${API_BASE}/api/search`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({query: q})
-      });
-      if(!res.ok) throw new Error(`Search failed (${res.status})`);
-      data = await res.json();
-    }
+    const res = await fetch(`${API_BASE}/api/search`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({query: q, demo: demoMode})
+    });
+    if(!res.ok) throw new Error(`Search failed (${res.status})`);
+    const data = await res.json();
     applySearchResponse(data);
+    if(demoMode && !(data.blocks || []).some(b => (b.results || []).length)){
+      showToast("No cached match — run a live search first");
+    }
   } catch(err){
     console.error(err);
     showToast("Search failed — is the backend running at " + API_BASE + "?");
@@ -1082,7 +1065,7 @@ function applySearchResponse(data){
   currentResults = primary.results.slice();
   currentBlockTags = primary.tags || [];
   resultsPage = 0;
-  renderInterp();
+  renderInterp(primary, data.fromCache, data.demo);
   sortResults(currentSortMode);
   renderExtraBlocks();
 
@@ -1093,7 +1076,7 @@ function applySearchResponse(data){
 }
 
 async function fetchRecommendationsForBlock(block, blockIndex){
-  if(demoMode || !block.results || !block.results.length) return;
+  if(!block.results || !block.results.length) return;
 
   pendingRecommendCount++;
   renderHeader();
@@ -1106,7 +1089,7 @@ async function fetchRecommendationsForBlock(block, blockIndex){
     const res = await fetch(`${API_BASE}/api/recommend`, {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({keywords: block.keywords, candidates}),
+      body: JSON.stringify({keywords: block.keywords, candidates, demo: demoMode}),
     });
     if(!res.ok) throw new Error(`Recommend failed (${res.status})`);
     const data = await res.json();
@@ -1151,12 +1134,44 @@ function goToResultsPage(delta){
   renderResults(lastRenderedArr);
 }
 
-function renderInterp(){
+function cacheNoticeText(block, demo){
+  if(!block || !block.fromCache) return "";
+  const source = block.cacheSource || "";
+  if(demo || demoMode){
+    if(block.cacheFresh){
+      return source
+        ? `Demo mode — cached results for ${source}`
+        : "Demo mode — cached results.";
+    }
+    return source
+      ? `Demo mode — closest cached match: ${source}`
+      : "Demo mode — closest cached match.";
+  }
+  if(block.cacheFresh){
+    return source
+      ? `Showing cached results for ${source} (live search skipped).`
+      : "Showing cached results (live search skipped).";
+  }
+  return source
+    ? `Live search failed — showing closest cached match: ${source}`
+    : "Live search failed — showing closest cached match.";
+}
+
+function renderInterp(primary, responseFromCache, demo){
   document.getElementById("filterChips").innerHTML = currentBlockTags.map(t=>`<span class="filter-chip">${t}</span>`).join("");
   const panel = document.getElementById("whyPanel");
   panel.textContent = searchRationale || "No additional interpretation notes for this query.";
   panel.hidden = true;
   document.getElementById("whyLink").textContent = "How was this interpreted?";
+
+  const note = document.getElementById("cacheNote");
+  const block = primary && (primary.fromCache || responseFromCache)
+    ? {fromCache: true, cacheFresh: !!(primary && primary.cacheFresh), cacheSource: (primary && primary.cacheSource) || ""}
+    : primary;
+  const text = cacheNoticeText(block, demo);
+  note.hidden = !text;
+  note.textContent = text;
+  note.classList.toggle("fresh", !!(block && (block.cacheFresh || demo || demoMode)));
 }
 
 function goToExtraBlockPage(blockIndex, delta){
@@ -1180,12 +1195,16 @@ function renderExtraBlocks(){
       ? items.map(r => buildResultRowHtml(r)).join("")
       : `<div class="bom-empty">No matches for this part.</div>`;
     const pagination = paginationHtml(page, totalPages, `goToExtraBlockPage(${blockIndex},-1)`, `goToExtraBlockPage(${blockIndex},1)`);
+    const cacheNote = block.fromCache
+      ? `<div class="cache-note${block.cacheFresh || demoMode ? " fresh" : ""}">${escHtml(cacheNoticeText(block, demoMode))}</div>`
+      : "";
     return `
       <div class="panel">
         <div class="results-toolbar">
-          <span>Also detected: <strong>${block.keywords}</strong> — <strong>${results.length}</strong> matches</span>
+          <span>Also detected: <strong>${escHtml(block.keywords)}</strong> — <strong>${results.length}</strong> matches</span>
           <span class="filter-chips">${tags}</span>
         </div>
+        ${cacheNote}
         <div class="table-scroll">
           <div class="parts-table" style="--cols:${buildColsString()}; min-width:${tableMinWidth()}px;">
             <div class="row-head">${buildHeaderCellsHtml()}</div>
@@ -1436,6 +1455,7 @@ function setMode(mode){
   document.getElementById("batchMode").style.display = mode==="batch" ? "" : "none";
   document.getElementById("interpLine").style.display = mode==="single" ? "" : "none";
   document.getElementById("whyPanel").hidden = true;
+  document.getElementById("cacheNote").hidden = mode !== "single" || !document.getElementById("cacheNote").textContent;
 }
 
 async function runBatch(){
@@ -1448,24 +1468,22 @@ async function runBatch(){
   btn.textContent = "Resolving…";
 
   try{
-    let data;
-    if(demoMode){
-      await new Promise(r => setTimeout(r, 250));
-      data = DEMO_DATA.demo_batch;
-    } else {
-      const res = await fetch(`${API_BASE}/api/batch-search`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({lines})
-      });
-      if(!res.ok) throw new Error(`Batch search failed (${res.status})`);
-      data = await res.json();
-    }
+    const res = await fetch(`${API_BASE}/api/batch-search`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({lines, demo: demoMode})
+    });
+    if(!res.ok) throw new Error(`Batch search failed (${res.status})`);
+    const data = await res.json();
 
-    let added = 0, unresolved = 0;
+    let added = 0, unresolved = 0, cached = 0, cachedFresh = 0;
     const batchRows = [];
     (data.results || []).forEach(line => {
       if(!line.resolved || !line.best_row){ unresolved++; return; }
+      if(line.fromCache){
+        cached++;
+        if(line.cacheFresh) cachedFresh++;
+      }
       const best = line.best_row;
       batchRows.push(best);
       const existing = bom.find(l => l.dk === best.dk);
@@ -1478,7 +1496,15 @@ async function runBatch(){
 
     renderBom();
     if(added) setBomPanelVisible(true);
-    showToast(`Resolved ${added} line${added===1?'':'s'}` + (unresolved ? `, ${unresolved} need review` : ""));
+    let toast = `Resolved ${added} line${added===1?'':'s'}` + (unresolved ? `, ${unresolved} need review` : "");
+    if(demoMode && !added){
+      toast = "No cached match — run a live search first";
+    } else if(cached){
+      toast += cachedFresh === cached
+        ? `, ${cached} from cache`
+        : `, ${cached} from cache (closest match)`;
+    }
+    showToast(toast);
   } catch(err){
     console.error(err);
     showToast("Batch resolve failed — is the backend running at " + API_BASE + "?");
