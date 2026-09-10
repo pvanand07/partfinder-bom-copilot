@@ -199,6 +199,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .batch-foot{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:8px;}
 .batch-hint{font-size:11px; color:var(--muted);}
 
+.results-foot{
+  display:flex; justify-content:flex-end; padding:10px 15px 12px;
+  border-top:1px solid var(--line);
+}
+
 .interp-line{
   margin-top:10px; padding-top:9px; border-top:1px solid var(--line);
   display:flex; flex-wrap:wrap; align-items:center; gap:7px; font-size:12px;
@@ -291,8 +296,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 .cell-qty{display:flex; align-items:center; justify-content:center;}
 .cell-qty-head{text-align:center;}
+.cell-rec-head{
+  text-align:center; font-weight:600; color:var(--muted); letter-spacing:.03em;
+}
+.cell-rec{
+  text-align:center; color:var(--muted); font-size:11.5px; padding-top:2px;
+}
+.cell-rec.met{color:var(--good);}
 .cell-qty .bom-qty .qty-frac{
-  font-family:"IBM Plex Mono"; font-size:12px; min-width:28px; text-align:center;
+  font-family:"IBM Plex Mono"; font-size:12px; min-width:16px; text-align:center;
+  color:var(--ink);
 }
 .qty-frac{color:var(--muted); font-size:11.5px;}
 .qty-frac.met{color:var(--good);}
@@ -376,6 +389,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .sum-row .v{font-family:"IBM Plex Mono";}
 .sum-note{font-size:11px; color:var(--warn); margin:2px 0 9px;}
 .bom-actions{display:flex; align-items:center; gap:12px; margin-top:10px;}
+.bom-actions.cart-actions{justify-content:space-between;}
 .lock-link{display:block; margin-top:9px; font-size:11.5px;}
 .lock-link.locked{color:var(--good);}
 
@@ -479,7 +493,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
             <div id="resultList"></div>
           </div>
         </div>
+        <div class="results-foot">
+          <button class="btn-primary" id="addRecQtyBtn" onclick="addAllRecQty()" disabled>Add Reccomended QTY</button>
+        </div>
       </div>
+
+      <div id="extraBlocks"></div>
 
       <div class="panel cart-panel">
         <div class="bom-head">
@@ -493,9 +512,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
           <div class="sum-row"><span>Line items</span><span class="v" id="cartSumLines">0</span></div>
           <div class="sum-row"><span>Total units</span><span class="v" id="cartSumUnits">0</span></div>
           <div class="sum-row total"><span>Estimated cost</span><span class="v" id="cartSumCost">$0.00</span></div>
-          <div class="bom-actions">
-            <button class="btn-primary" onclick="checkout()">Checkout → BOM</button>
+          <div class="bom-actions cart-actions">
             <button class="linklike" onclick="clearCart()">Clear cart</button>
+            <button class="btn-primary" onclick="checkout()">Checkout → BOM</button>
           </div>
         </div>
       </div>
@@ -533,49 +552,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 <div class="toast" id="toast"></div>
 
 <script>
-const CATALOG = {
-  "10k 0603 1% resistor for a voltage divider, tape and reel": [
-    {dk:"311-10.0KHRCT-ND", mfr:"Yageo", mpn:"RC0603FR-0710KL", attrs:"10kΩ · ±1% · 0603 · 100mW · T&R", stock:284000, status:"in", price:0.0048, moq:1, best:true, rohs:true, lifecycle:"Active", matchScore:4, matchNote:"Exact match on all criteria", alts:[{mpn:"RC0603JR-0710KL",why:"±5% tol., 40% cheaper"},{mpn:"RT0603FRE0710KL",why:"AEC-Q200, +$0.002"}]},
-    {dk:"541-10KFCT-ND", mfr:"Stackpole", mpn:"RMCF0603FT10K0", attrs:"10kΩ · ±1% · 0603 · 100mW · T&R", stock:96500, status:"in", price:0.0061, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:4, matchNote:"Exact match, alternate manufacturer"},
-    {dk:"P10KACT-ND", mfr:"Panasonic", mpn:"ERJ-3EKF1002V", attrs:"10kΩ · ±1% · 0603 · 100mW · AEC-Q200", stock:41200, status:"in", price:0.0079, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:4, matchNote:"Exact match, adds automotive qualification"},
-    {dk:"311-10.0KGRCT-ND", mfr:"Yageo", mpn:"RC0603FR-0710KG", attrs:"10kΩ · ±0.5% · 0603 · T&R", stock:18700, status:"in", price:0.0143, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:3, matchNote:"Tighter tolerance than needed — extra cost for no benefit here"},
-    {dk:"RMCF0603-10K0-ND", mfr:"Stackpole", mpn:"RMCF0603JT10K0", attrs:"10kΩ · ±5% · 0603 · Cut Tape", stock:640, status:"low", price:0.0031, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:3, matchNote:"±5% tolerance — looser than the ±1% requested"}
-  ],
-  "3.3V 1A buck regulator, small footprint, no external diode": [
-    {dk:"296-TPS62203DBVR-ND", mfr:"Texas Instruments", mpn:"TPS62203DBVR", attrs:"3.3V out · 1A · sync (no diode) · SOT-23-5", stock:15400, status:"in", price:1.12, moq:1, best:true, rohs:true, lifecycle:"Active", matchScore:4, matchNote:"Meets all criteria — sync topology, 3.3V, 1A, smallest case"},
-    {dk:"AP63203WU-7-ND", mfr:"Diodes Inc", mpn:"AP63203WU-7", attrs:"3.3V out · 2A · sync · WSON-6", stock:9800, status:"in", price:0.61, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:4, matchNote:"Meets all criteria, 2A headroom, needs a thermal pad"},
-    {dk:"296-51204-1-ND", mfr:"Texas Instruments", mpn:"TLV62569DBVR", attrs:"3.3V out · 1.5A · sync · SOT-23-6", stock:7200, status:"in", price:0.54, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:4, matchNote:"Meets all criteria, 1.5A headroom"},
-    {dk:"713-RT7276GE-ND", mfr:"Richtek", mpn:"RT7276GE", attrs:"3.3V out · 1A · sync · SOT-23-6", stock:5200, status:"in", price:0.47, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:4, matchNote:"Meets all criteria, logic-level EN pin"},
-    {dk:"MP2307DN-LF-Z-ND", mfr:"Monolithic Power", mpn:"MP2307DN-LF-Z", attrs:"adjustable · 3A · needs cat. diode · SO-8", stock:2100, status:"in", price:0.71, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:2, matchNote:"Non-synchronous (needs external diode) and larger SO-8 package"},
-    {dk:"1691-XC9236A33CDR-ND", mfr:"Torex", mpn:"XC9236A33", attrs:"3.3V out · 0.6A · sync · SOT-25", stock:12800, status:"in", price:0.39, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:3, matchNote:"Only 0.6A — below the 1A requirement"}
-  ],
-  "USB-C receptacle, SMD, 16 pin, for power + data": [
-    {dk:"609-4612-1-ND", mfr:"GCT", mpn:"USB4110-GF-A", attrs:"16-pin · SMD · USB 2.0 data + power", stock:6400, status:"in", price:0.44, moq:1, best:true, rohs:true, lifecycle:"Active", matchScore:4, matchNote:"Meets all criteria — standard 16-pin SMD footprint"},
-    {dk:"1175-1521-1-ND", mfr:"Amphenol", mpn:"12401610E4#2A", attrs:"16-pin · SMD + through-hole tabs", stock:2900, status:"in", price:0.68, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:4, matchNote:"Meets all criteria, adds through-hole tabs for strength"},
-    {dk:"2073-TYPEC31MI2R1500-ND", mfr:"Hroparts", mpn:"TYPE-C-31-M-12", attrs:"16-pin · SMD · USB 2.0 data + power", stock:1800, status:"in", price:0.31, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:4, matchNote:"Meets all criteria, lowest cost"},
-    {dk:"670-DX07S016JJ2R1500-ND", mfr:"JAE", mpn:"DX07S016JJ2R1500", attrs:"16-pin · SMD · USB 2.0 data + power", stock:950, status:"in", price:1.05, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:4, matchNote:"Meets all criteria, reinforced automotive-grade housing"},
-    {dk:"2073-USB4085-GF-ATR-ND", mfr:"GCT", mpn:"USB4085-GF-A", attrs:"24-pin · SMD · full pinout, unused for USB2", stock:410, status:"low", price:0.91, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:3, matchNote:"24-pin part — 8 pins unused for a USB 2.0-only design"},
-    {dk:"839-GT-USB-3140-ND", mfr:"GCT", mpn:"GT-USB-3140", attrs:"16-pin · through-hole · USB 2.0 data + power", stock:3100, status:"in", price:0.52, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:3, matchNote:"Through-hole mount — spec calls for SMD"}
-  ],
-  "100nF 0402 X7R decoupling cap, 16V+": [
-    {dk:"311-1182-1-ND", mfr:"Yageo", mpn:"CC0402KRX7R7BB104", attrs:"100nF · 16V · X7R · 0402", stock:512000, status:"in", price:0.0021, moq:1, best:true, rohs:true, lifecycle:"Active", matchScore:4, matchNote:"Exact spec, bulk stock, lowest cost"},
-    {dk:"587-1602-1-ND", mfr:"Murata", mpn:"GRM155R71C104KA88D", attrs:"100nF · 16V · X7R · 0402", stock:220000, status:"in", price:0.0034, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:4, matchNote:"Exact match, alternate manufacturer"},
-    {dk:"490-GCM155R71C104KA55-ND", mfr:"Murata", mpn:"GCM155R71C104KA55D", attrs:"100nF · 16V · X7R · 0402", stock:340000, status:"in", price:0.0028, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:4, matchNote:"Exact match, alternate Murata part"},
-    {dk:"445-C1005X7R1C104-ND", mfr:"TDK", mpn:"C1005X7R1C104K050BC", attrs:"100nF · 16V · X7R · 0402", stock:410000, status:"in", price:0.0026, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:4, matchNote:"Exact match, lowest-cost alternate"},
-    {dk:"1276-1069-1-ND", mfr:"Samsung", mpn:"CL05B104KO5NNNC", attrs:"100nF · 50V · X7R · 0402 · extra headroom", stock:88000, status:"in", price:0.0041, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:4, matchNote:"Meets all criteria, 50V headroom"},
-    {dk:"445-CGA2B3X7R1C-ND", mfr:"TDK", mpn:"CGA2B3X7R1C104K050BB", attrs:"100nF · 16V · X6S · 0402", stock:96000, status:"in", price:0.0024, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:3, matchNote:"X6S dielectric — narrower temperature range than the X7R requested"}
-  ],
-  "ESD protection diode array for USB data lines": [
-    {dk:"296-30880-1-ND", mfr:"Texas Instruments", mpn:"TPD4E05U06DQAR", attrs:"4-channel · USB 2.0 rated · SOT-23-6", stock:31000, status:"in", price:0.29, moq:1, best:true, rohs:true, lifecycle:"Active", matchScore:4, matchNote:"4-channel covers D+/D- plus 2 spares, low clamp voltage"},
-    {dk:"863-SRV05-4TCT-ND", mfr:"Semtech", mpn:"SRV05-4.TCT", attrs:"4-channel · USB 2.0 rated · SOT-23-6", stock:8700, status:"in", price:0.24, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:4, matchNote:"Meets all criteria, alternate 4-channel part"},
-    {dk:"1727-4076-1-ND", mfr:"Nexperia", mpn:"PRTR5V0U2X,215", attrs:"2-channel · SOT-143 · lower cost", stock:14500, status:"in", price:0.14, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:3, matchNote:"2-channel — only covers D+/D-, no spare lines"},
-    {dk:"497-USBLC62SC6-ND", mfr:"STMicroelectronics", mpn:"USBLC6-2SC6", attrs:"2-channel · SOT-23-6 · lower cost", stock:22000, status:"in", price:0.21, moq:1, best:false, rohs:true, lifecycle:"Active", matchScore:3, matchNote:"2-channel — only covers D+/D-, no spare lines"},
-    {dk:"475-1400-1-ND", mfr:"ON Semi", mpn:"NUP4114MR6T1G", attrs:"4-channel · SOT-666 (tiny) · higher clamp V", stock:0, status:"out", price:0.19, moq:3000, best:false, rohs:true, lifecycle:"NRND", matchScore:2, matchNote:"Out of stock and NRND lifecycle — smallest package but limited availability"}
-  ]
-};
+const API_BASE = "http://localhost:8000";
 
-let currentQuery = "10k 0603 1% resistor for a voltage divider, tape and reel";
 let currentResults = [];
+let currentBlockTags = [];
+let searchBlocks = [];
+let searchRationale = "";
 let currentSortMode = "fit";
 let bom = [];
 let bomIdSeq = 1;
@@ -583,28 +565,9 @@ let cart = [];
 let cartIdSeq = 1;
 let colState = { manufacturer: false, moq: false };
 
-const INTERP = {
-  "10k 0603 1% resistor for a voltage divider, tape and reel": {
-    tags: ["10kΩ","±1%","0603","Tape & Reel","RoHS"], matchTotal: 4,
-    text: "Voltage-divider use implies standard tolerance is fine — deprioritizing exotic tempco parts in favor of reel-packaged, high-stock SKUs."
-  },
-  "3.3V 1A buck regulator, small footprint, no external diode": {
-    tags: ["Sync buck","3.3V out","≥1A","Small SMD"], matchTotal: 4,
-    text: "\"No external diode\" rules out non-synchronous topologies — sync converters are ranked above the adjustable MP2307 for that reason."
-  },
-  "USB-C receptacle, SMD, 16 pin, for power + data": {
-    tags: ["USB-C","16-pin","SMD","USB 2.0"], matchTotal: 4,
-    text: "16 pins covers USB 2.0 data + power. 24-pin (full USB3 pinout) and through-hole parts are shown but ranked lower."
-  },
-  "100nF 0402 X7R decoupling cap, 16V+": {
-    tags: ["100nF","X7R","0402","≥16V"], matchTotal: 4,
-    text: "Standard decoupling values — ranked by cost at spec, with a non-X7R dielectric part shown lower despite matching capacitance."
-  },
-  "ESD protection diode array for USB data lines": {
-    tags: ["TVS array","USB-rated","2–4 ch"], matchTotal: 4,
-    text: "Channel count depends on how many lines need protection — 4-channel covers D+/D- with two spares for GPIO/ID lines."
-  }
-};
+function allResultRows(){
+  return searchBlocks.flatMap(b => b.results || []);
+}
 
 function fmtStock(n){
   if(n >= 1000) return (n/1000).toFixed(n%1000===0?0:1) + "k";
@@ -621,21 +584,74 @@ function setQuery(q){
   runSearch();
 }
 
-function runSearch(){
+async function runSearch(){
   const q = document.getElementById("queryInput").value.trim();
-  currentQuery = CATALOG[q] ? q : Object.keys(CATALOG)[0];
-  currentResults = CATALOG[currentQuery].slice();
+  if(!q) return;
+  const btn = document.querySelector(".btn-search");
+  const prevLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Searching…";
+  try{
+    const res = await fetch(`${API_BASE}/api/search`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({query: q})
+    });
+    if(!res.ok) throw new Error(`Search failed (${res.status})`);
+    const data = await res.json();
+    applySearchResponse(data);
+  } catch(err){
+    console.error(err);
+    showToast("Search failed — is the backend running at " + API_BASE + "?");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prevLabel;
+  }
+}
+
+function applySearchResponse(data){
+  searchBlocks = data.blocks || [];
+  searchRationale = data.rationale || "";
+  const primary = searchBlocks[0] || {tags: [], results: [], keywords: ""};
+  currentResults = primary.results.slice();
+  currentBlockTags = primary.tags || [];
   renderInterp();
-  sortResults("fit");
+  sortResults(currentSortMode);
+  renderExtraBlocks();
 }
 
 function renderInterp(){
-  const d = INTERP[currentQuery];
-  document.getElementById("filterChips").innerHTML = d.tags.map(t=>`<span class="filter-chip">${t}</span>`).join("");
+  document.getElementById("filterChips").innerHTML = currentBlockTags.map(t=>`<span class="filter-chip">${t}</span>`).join("");
   const panel = document.getElementById("whyPanel");
-  panel.textContent = d.text;
+  panel.textContent = searchRationale || "No additional interpretation notes for this query.";
   panel.style.display = "none";
   document.getElementById("whyLink").textContent = "How was this interpreted?";
+}
+
+function renderExtraBlocks(){
+  const container = document.getElementById("extraBlocks");
+  const extras = searchBlocks.slice(1);
+  if(!extras.length){ container.innerHTML = ""; return; }
+
+  container.innerHTML = extras.map((block, i) => {
+    const tags = (block.tags || []).map(t=>`<span class="filter-chip">${t}</span>`).join("");
+    const rows = (block.results || []).length
+      ? block.results.map(r => buildResultRowHtml(r)).join("")
+      : `<div class="bom-empty">No matches for this part.</div>`;
+    return `
+      <div class="panel">
+        <div class="results-toolbar">
+          <span>Also detected: <strong>${block.keywords}</strong> — <strong>${(block.results||[]).length}</strong> matches</span>
+          <span class="filter-chips">${tags}</span>
+        </div>
+        <div class="table-scroll">
+          <div class="parts-table">
+            <div class="row-head">${buildHeaderCellsHtml()}</div>
+            <div>${rows}</div>
+          </div>
+        </div>
+      </div>`;
+  }).join("");
 }
 
 function toggleWhy(){
@@ -672,12 +688,12 @@ function buildColsString(){
   cols.push("64px");
   cols.push("72px");
   cols.push("76px");
-  cols.push("92px");
+  cols.push("40px");
+  cols.push("78px");
   return cols.join(" ");
 }
 
-function renderHeader(){
-  document.getElementById("partsTable").style.setProperty("--cols", buildColsString());
+function buildHeaderCellsHtml(){
   const cells = ["<div>Part</div>"];
   if(colState.manufacturer) cells.push("<div>Manufacturer</div>");
   cells.push("<div>Specs</div>");
@@ -686,8 +702,14 @@ function renderHeader(){
   cells.push('<div class="right">Unit</div>');
   cells.push('<div class="right">Qty 100</div>');
   cells.push("<div>Lifecycle</div>");
-  cells.push('<div class="cell-qty-head">Qty / Rec</div>');
-  document.getElementById("rowHead").innerHTML = cells.join("");
+  cells.push('<div class="cell-rec-head">Rec</div>');
+  cells.push('<div class="cell-qty-head">Qty</div>');
+  return cells.join("");
+}
+
+function renderHeader(){
+  document.getElementById("partsTable").style.setProperty("--cols", buildColsString());
+  document.getElementById("rowHead").innerHTML = buildHeaderCellsHtml();
 }
 
 function sortResults(mode){
@@ -705,48 +727,57 @@ function refreshResults(){
   if(lastRenderedArr.length) renderResults(lastRenderedArr);
 }
 
+function buildResultRowHtml(r){
+  const total = r.matchTotal;
+  const alts = r.alts || [];
+  const safeId = r.dk.replace(/[^a-zA-Z0-9]/g, "");
+  const stockNote = r.status === "out" ? `<span class="stock-note">~12wk lead</span>`
+    : r.status === "low" ? `<span class="stock-note">low stock</span>` : "";
+  const dots = Array.from({length: total}, (_, i) => i < r.matchScore ? "●" : "○").join("");
+
+  const cells = [];
+  cells.push(`
+    <div class="cell-part">
+      <div class="mpn" title="${r.matchNote.replace(/"/g,'&quot;')}">${r.best ? '<span class="star">★</span>' : ''}${r.mpn}</div>
+      <div class="sub">DK# ${r.dk}${colState.manufacturer ? '' : ' · ' + r.mfr} · <a class="linklike" href="#" onclick="return false;">Datasheet ↗</a></div>
+      <div class="match ${r.matchScore < total ? 'partial' : ''}" title="${r.matchNote.replace(/"/g,'&quot;')}">${dots}<span class="frac">${r.matchScore}/${total}</span></div>
+      ${alts.length ? `<button class="linklike alt-link" onclick="toggleAlt('${safeId}')">+${alts.length} alternate${alts.length>1?'s':''}</button>` : ''}
+      ${alts.length ? `<div class="alt-panel" id="alt-row-${safeId}">${alts.map(a=>`<div class="alt-item"><span class="mono">${a.mpn}</span><span class="why">${a.why}</span></div>`).join("")}</div>` : ''}
+    </div>`);
+  if(colState.manufacturer) cells.push(`<div class="cell-mfr">${r.mfr}</div>`);
+  cells.push(`<div class="cell-specs">${r.attrs}${r.rohs ? ' · RoHS' : ''}</div>`);
+  cells.push(`<div class="cell-stock ${r.status}"><span class="mono">${fmtStock(r.stock)}</span>${stockNote}</div>`);
+  if(colState.moq) cells.push(`<div class="right mono">${r.moq > 1 ? r.moq.toLocaleString() : '—'}</div>`);
+  cells.push(`<div class="right mono">${fmtPrice(r.price)}</div>`);
+  cells.push(`<div class="right mono">${money(r.price*100)}</div>`);
+  cells.push(`<div class="cell-life ${r.lifecycle === 'NRND' ? 'life-warn' : ''}">${r.lifecycle}</div>`);
+  const cartLine = cart.find(c => c.dk === r.dk);
+  const cartQty = cartLine ? cartLine.qty : 0;
+  const rec = recommendedQty(nextDesignators(r));
+  const desig = nextDesignators(r);
+  cells.push(`<div class="cell-rec mono ${cartQty >= rec && cartQty > 0 ? 'met' : ''}" title="Recommended quantity based on designators ${desig}">${rec}</div>`);
+  cells.push(`<div class="cell-qty">
+    <div class="bom-qty">
+      <button class="qty-step" onclick="changeResultCartQty('${r.dk}', -1)" aria-label="Decrease quantity"${cartQty === 0 ? ' disabled' : ''}>−</button>
+      <span class="qty-frac mono ${cartQty >= rec && cartQty > 0 ? 'met' : ''}" title="Quantity in cart">${cartQty}</span>
+      <button class="qty-step" onclick="changeResultCartQty('${r.dk}', 1)" aria-label="Increase quantity">+</button>
+    </div>
+  </div>`);
+
+  return `<div class="row ${r.best ? 'row-best' : ''}">${cells.join("")}</div>`;
+}
+
 function renderResults(arr){
   lastRenderedArr = arr;
   document.getElementById("resultCount").textContent = arr.length;
+  document.getElementById("addRecQtyBtn").disabled = arr.length === 0;
   renderHeader();
   const list = document.getElementById("resultList");
-  const total = INTERP[currentQuery].matchTotal;
-  list.innerHTML = arr.map(r => {
-    const alts = r.alts || [];
-    const safeId = r.dk.replace(/[^a-zA-Z0-9]/g, "");
-    const stockNote = r.status === "out" ? `<span class="stock-note">~12wk lead</span>`
-      : r.status === "low" ? `<span class="stock-note">low stock</span>` : "";
-    const dots = Array.from({length: total}, (_, i) => i < r.matchScore ? "●" : "○").join("");
-
-    const cells = [];
-    cells.push(`
-      <div class="cell-part">
-        <div class="mpn" title="${r.matchNote.replace(/"/g,'&quot;')}">${r.best ? '<span class="star">★</span>' : ''}${r.mpn}</div>
-        <div class="sub">DK# ${r.dk}${colState.manufacturer ? '' : ' · ' + r.mfr} · <a class="linklike" href="#" onclick="return false;">Datasheet ↗</a></div>
-        <div class="match ${r.matchScore < total ? 'partial' : ''}" title="${r.matchNote.replace(/"/g,'&quot;')}">${dots}<span class="frac">${r.matchScore}/${total}</span></div>
-        ${alts.length ? `<button class="linklike alt-link" onclick="toggleAlt('${safeId}')">+${alts.length} alternate${alts.length>1?'s':''}</button>` : ''}
-        ${alts.length ? `<div class="alt-panel" id="alt-row-${safeId}">${alts.map(a=>`<div class="alt-item"><span class="mono">${a.mpn}</span><span class="why">${a.why}</span></div>`).join("")}</div>` : ''}
-      </div>`);
-    if(colState.manufacturer) cells.push(`<div class="cell-mfr">${r.mfr}</div>`);
-    cells.push(`<div class="cell-specs">${r.attrs}${r.rohs ? ' · RoHS' : ''}</div>`);
-    cells.push(`<div class="cell-stock ${r.status}"><span class="mono">${fmtStock(r.stock)}</span>${stockNote}</div>`);
-    if(colState.moq) cells.push(`<div class="right mono">${r.moq > 1 ? r.moq.toLocaleString() : '—'}</div>`);
-    cells.push(`<div class="right mono">${fmtPrice(r.price)}</div>`);
-    cells.push(`<div class="right mono">${money(r.price*100)}</div>`);
-    cells.push(`<div class="cell-life ${r.lifecycle === 'NRND' ? 'life-warn' : ''}">${r.lifecycle}</div>`);
-    const cartLine = cart.find(c => c.dk === r.dk);
-    const cartQty = cartLine ? cartLine.qty : 0;
-    const rec = recommendedQty(nextDesignators(r));
-    cells.push(`<div class="cell-qty">
-      <div class="bom-qty">
-        <button class="qty-step" onclick="changeResultCartQty('${r.dk}', -1)" aria-label="Decrease quantity"${cartQty === 0 ? ' disabled' : ''}>−</button>
-        <span class="qty-frac mono ${cartQty >= rec && cartQty > 0 ? 'met' : ''}" title="In cart / recommended quantity, based on designators ${nextDesignators(r)}">${cartQty}/${rec}</span>
-        <button class="qty-step" onclick="changeResultCartQty('${r.dk}', 1)" aria-label="Increase quantity">+</button>
-      </div>
-    </div>`);
-
-    return `<div class="row ${r.best ? 'row-best' : ''}">${cells.join("")}</div>`;
-  }).join("");
+  if(!arr.length){
+    list.innerHTML = `<div class="bom-empty" style="padding:28px 15px;">No matching parts found for this query. Try loosening a constraint (tolerance, package, voltage) and search again.</div>`;
+    return;
+  }
+  list.innerHTML = arr.map(r => buildResultRowHtml(r)).join("");
 }
 
 function toggleAlt(id){
@@ -762,41 +793,64 @@ function setMode(mode){
   document.getElementById("whyPanel").style.display = "none";
 }
 
-function bestKeywordMatch(text){
-  const words = text.toLowerCase().split(/[\s,]+/).filter(w => w.length > 2);
-  let best = null, bestScore = 0;
-  Object.keys(CATALOG).forEach(k => {
-    const kLower = k.toLowerCase();
-    const score = words.filter(w => kLower.includes(w)).length;
-    if(score > bestScore){ bestScore = score; best = k; }
-  });
-  return bestScore >= 2 ? best : null;
-}
-
-function runBatch(){
+async function runBatch(){
   const lines = document.getElementById("batchInput").value.split("\n").map(l=>l.trim()).filter(Boolean);
-  let added = 0, unresolved = 0;
-  lines.forEach(line => {
-    const qtyMatch = line.match(/^(\d+)\s*x?\s+/i);
-    const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
-    const text = qtyMatch ? line.slice(qtyMatch[0].length) : line;
-    const key = Object.keys(CATALOG).find(k => k.toLowerCase().includes(text.toLowerCase().split(",")[0].split(" ").slice(0,3).join(" ").toLowerCase()))
-      || bestKeywordMatch(text);
-    if(key){
-      const best = CATALOG[key].find(p=>p.best) || CATALOG[key][0];
+  if(!lines.length) return;
+
+  const btn = document.querySelector('#batchMode .btn-primary');
+  const prevLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Resolving…";
+
+  try{
+    const res = await fetch(`${API_BASE}/api/batch-search`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({lines})
+    });
+    if(!res.ok) throw new Error(`Batch search failed (${res.status})`);
+    const data = await res.json();
+
+    let added = 0, unresolved = 0;
+    const batchRows = [];
+    (data.results || []).forEach(line => {
+      if(!line.resolved || !line.best_row){ unresolved++; return; }
+      const best = line.best_row;
+      batchRows.push(best);
       const existing = bom.find(l => l.dk === best.dk);
-      if(existing){ existing.qty += qty; } else {
-        bom.push({id: bomIdSeq++, dk: best.dk, mpn: best.mpn, mfr: best.mfr, price: best.price, stock: best.stock, status: best.status, qty, desig: nextDesignators(best)});
+      if(existing){ existing.qty += line.qty; } else {
+        bom.push({id: bomIdSeq++, dk: best.dk, mpn: best.mpn, mfr: best.mfr, price: best.price, stock: best.stock, status: best.status, qty: line.qty, desig: nextDesignators(best)});
       }
       added++;
-    } else { unresolved++; }
-  });
-  renderBom();
-  showToast(`Resolved ${added} line${added===1?'':'s'}` + (unresolved ? `, ${unresolved} need review` : ""));
+    });
+    if(batchRows.length) searchBlocks.push({keywords: "Paste BOM", tags: [], results: batchRows});
+
+    renderBom();
+    showToast(`Resolved ${added} line${added===1?'':'s'}` + (unresolved ? `, ${unresolved} need review` : ""));
+  } catch(err){
+    console.error(err);
+    showToast("Batch resolve failed — is the backend running at " + API_BASE + "?");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prevLabel;
+  }
 }
 
 function findPart(dk){
-  for(const key in CATALOG){ const hit = CATALOG[key].find(p=>p.dk===dk); if(hit) return hit; }
+  return allResultRows().find(p => p.dk === dk);
+}
+
+function setResultCartQty(dk, qty){
+  const part = findPart(dk);
+  if(!part || qty < 1) return;
+  const existing = cart.find(l => l.dk === dk);
+  if(existing){ existing.qty = qty; }
+  else{
+    cart.push({
+      id: cartIdSeq++, dk: part.dk, mpn: part.mpn, mfr: part.mfr, price: part.price,
+      stock: part.stock, status: part.status, qty, desig: nextDesignators(part)
+    });
+  }
 }
 
 function changeResultCartQty(dk, delta){
@@ -806,7 +860,7 @@ function changeResultCartQty(dk, delta){
   if(delta > 0){
     if(existing){ existing.qty += 1; }
     else{
-      cart.push({id: cartIdSeq++, dk: part.dk, mpn: part.mpn, mfr: part.mfr, price: part.price, stock: part.stock, status: part.status, qty: 1, desig: nextDesignators(part)});
+      setResultCartQty(dk, 1);
       showToast(part.mpn + " added to cart");
     }
   } else if(existing){
@@ -815,6 +869,22 @@ function changeResultCartQty(dk, delta){
   }
   renderCart();
   refreshResults();
+}
+
+function addAllRecQty(){
+  if(!lastRenderedArr.length){ showToast("No results to add"); return; }
+  let added = 0;
+  lastRenderedArr.forEach(r => {
+    const rec = recommendedQty(nextDesignators(r));
+    const existing = cart.find(l => l.dk === r.dk);
+    if(!existing || existing.qty !== rec){
+      setResultCartQty(r.dk, rec);
+      added++;
+    }
+  });
+  renderCart();
+  refreshResults();
+  showToast(added ? `Set recommended qty for ${added} part${added === 1 ? "" : "s"}` : "All parts already at recommended qty");
 }
 
 function recommendedQty(desigText){
@@ -1104,13 +1174,6 @@ document.addEventListener("click", e => {
 loadTunerColors();
 renderHeader();
 runSearch();
-(function seedBom(){
-  [["609-4612-1-ND",1], ["296-TPS62203DBVR-ND",1]].forEach(([dk, qty]) => {
-    const part = findPart(dk);
-    bom.push({id: bomIdSeq++, dk: part.dk, mpn: part.mpn, mfr: part.mfr, price: part.price, stock: part.stock, status: part.status, qty, desig: nextDesignators(part)});
-  });
-})();
 renderBom();
 renderCart();
-refreshResults();
 </script>
