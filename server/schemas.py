@@ -29,6 +29,11 @@ class Alternate(BaseModel):
     why: str
 
 
+class PriceBreak(BaseModel):
+    qty: int
+    price: float
+
+
 class ResultRow(BaseModel):
     dk: str
     mfr: str
@@ -45,6 +50,29 @@ class ResultRow(BaseModel):
     matchTotal: int
     matchNote: str
     alts: list[Alternate] = []
+
+    # Additional real DigiKey fields, surfaced as optional/hideable frontend columns.
+    photoUrl: Optional[str] = None
+    datasheetUrl: Optional[str] = None
+    productUrl: Optional[str] = None
+    series: Optional[str] = None
+    leadWeeks: Optional[str] = None
+    discontinued: bool = False
+    endOfLife: bool = False
+    ncnr: bool = False
+    backOrderNotAllowed: bool = False
+    reachStatus: Optional[str] = None
+    moistureSensitivityLevel: Optional[str] = None
+    exportControlClassNumber: Optional[str] = None
+    htsusCode: Optional[str] = None
+    manufacturerPublicQuantity: Optional[int] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    otherNames: list[str] = []
+    marketplace: bool = False
+    tariffActive: bool = False
+    priceBreaks: list[PriceBreak] = []
+    priceAt100: Optional[float] = None
 
 
 class ResultBlock(BaseModel):

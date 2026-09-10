@@ -1,6 +1,6 @@
 import re
 
-from server.schemas import Alternate, ExtractedAttribute, ResultRow
+from server.schemas import Alternate, ExtractedAttribute, PriceBreak, ResultRow
 
 _MULTIPLIERS = {
     "p": 1e-12, "n": 1e-9, "u": 1e-6, "µ": 1e-6, "m": 1e-3,
@@ -89,6 +89,25 @@ def _unit_price(variation: dict, product: dict) -> float:
     return float(product.get("UnitPrice") or 0.0)
 
 
+def _price_breaks(variation: dict) -> list[PriceBreak]:
+    return [
+        PriceBreak(qty=pb.get("BreakQuantity", 0), price=float(pb.get("UnitPrice", 0.0)))
+        for pb in (variation.get("StandardPricing") or [])
+    ]
+
+
+def _price_at_qty(breaks: list[PriceBreak], qty: int) -> float | None:
+    """Real qty-break price lookup — the unit price of the highest break tier at or
+    below `qty` (standard distributor pricing: you pay the tier your order quantity
+    qualifies for), falling back to the lowest tier if `qty` is below all of them."""
+    if not breaks:
+        return None
+    applicable = [b for b in breaks if b.qty <= qty]
+    if applicable:
+        return max(applicable, key=lambda b: b.qty).price
+    return min(breaks, key=lambda b: b.qty).price
+
+
 def _attrs_summary(product: dict, variation: dict) -> str:
     parts = [f"{p.get('ParameterText')}: {p.get('ValueText')}" for p in (product.get("Parameters") or [])[:4]]
     package_type = (variation.get("PackageType") or {}).get("Name")
@@ -109,10 +128,16 @@ def flatten_products(products: list[dict], attributes: list[ExtractedAttribute])
         mfr = (product.get("Manufacturer") or {}).get("Name", "")
         mpn = product.get("ManufacturerProductNumber", "")
         lifecycle = (product.get("ProductStatus") or {}).get("Status", "Active")
-        rohs = _is_rohs(product.get("Classifications") or {})
+        classifications = product.get("Classifications") or {}
+        rohs = _is_rohs(classifications)
+        series = (product.get("Series") or {}).get("Name")
+        description = (product.get("Description") or {}).get("ProductDescription") or None
+        category = (product.get("Category") or {}).get("Name")
+        other_names = product.get("OtherNames") or []
 
         for variation in variations:
             stock = variation.get("QuantityAvailableforPackageType", product.get("QuantityAvailable", 0))
+            price_breaks = _price_breaks(variation)
             alts = [
                 Alternate(
                     mpn=f"{mpn} ({(v.get('PackageType') or {}).get('Name', 'alt packaging')})",
@@ -138,6 +163,27 @@ def flatten_products(products: list[dict], attributes: list[ExtractedAttribute])
                 matchTotal=len(attributes),
                 matchNote=match_note,
                 alts=alts,
+                photoUrl=product.get("PhotoUrl") or None,
+                datasheetUrl=product.get("DatasheetUrl") or None,
+                productUrl=product.get("ProductUrl") or None,
+                series=series,
+                leadWeeks=product.get("ManufacturerLeadWeeks") or None,
+                discontinued=bool(product.get("Discontinued")),
+                endOfLife=bool(product.get("EndOfLife")),
+                ncnr=bool(product.get("Ncnr")),
+                backOrderNotAllowed=bool(product.get("BackOrderNotAllowed")),
+                reachStatus=classifications.get("ReachStatus") or None,
+                moistureSensitivityLevel=classifications.get("MoistureSensitivityLevel") or None,
+                exportControlClassNumber=classifications.get("ExportControlClassNumber") or None,
+                htsusCode=classifications.get("HtsusCode") or None,
+                manufacturerPublicQuantity=product.get("ManufacturerPublicQuantity"),
+                description=description,
+                category=category,
+                otherNames=other_names,
+                marketplace=bool(variation.get("MarketPlace")),
+                tariffActive=bool(variation.get("TariffActive")),
+                priceBreaks=price_breaks,
+                priceAt100=_price_at_qty(price_breaks, 100),
             ))
 
     # price == 0.0 means no real pricing data was found (see _unit_price), not an

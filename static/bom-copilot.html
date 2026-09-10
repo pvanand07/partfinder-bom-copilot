@@ -141,6 +141,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   gap:16px;
   align-items:start;
 }
+.grid.bom-collapsed{grid-template-columns:minmax(0,1fr);}
 @media (max-width: 900px){ .grid{grid-template-columns:1fr;} }
 
 .panel{
@@ -203,6 +204,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   display:flex; justify-content:flex-end; padding:10px 15px 12px;
   border-top:1px solid var(--line);
 }
+
+.pagination{
+  display:flex; align-items:center; justify-content:center; gap:14px;
+  padding:9px 15px; border-top:1px solid var(--line); font-size:12px;
+}
+.pagination .page-indicator{color:var(--muted);}
+.pagination button:disabled{opacity:.4; cursor:default;}
 
 .interp-line{
   margin-top:10px; padding-top:9px; border-top:1px solid var(--line);
@@ -267,21 +275,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .row.row-best{border-left-color:var(--accent);}
 
 .cell-part{min-width:0;}
+.cell-part.has-photo{display:flex; gap:8px; align-items:flex-start; min-width:0;}
+.cell-part .part-thumb{width:34px; height:34px; object-fit:contain; background:#fff; border:1px solid var(--line); border-radius:4px; flex:none; padding:2px;}
+.cell-part .part-text{min-width:0; flex:1 1 auto;}
 .cell-part .mpn{font-family:"IBM Plex Mono"; font-weight:600; font-size:12.5px;}
 .cell-part .star{color:var(--accent); font-size:11px; margin-right:3px;}
 .cell-part .sub{font-size:11px; color:var(--muted); margin-top:2px;}
 .cell-part .sub .linklike{font-size:11px;}
-.match{font-size:10.5px; color:var(--muted); margin-top:3px; letter-spacing:1px;}
-.match .frac{letter-spacing:0; margin-left:4px; font-family:"IBM Plex Mono";}
-.match.partial .frac{color:var(--warn); font-weight:600;}
-.alt-link{font-size:11px; margin-top:3px; display:inline-block;}
-.alt-panel{
-  display:none; margin-top:6px; padding:8px 10px; background:var(--surface-2); border-radius:var(--radius-sm);
-  font-size:11px; flex-direction:column; gap:4px;
-}
-.alt-panel.open{display:flex;}
-.alt-panel .alt-item .mono{font-weight:600; margin-right:6px;}
-.alt-panel .alt-item .why{color:var(--muted);}
 
 .cell-mfr{color:var(--ink); min-width:0;}
 .cell-specs{color:var(--ink); min-width:0;}
@@ -293,6 +293,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 .cell-life{color:var(--muted);}
 .cell-life.life-warn{color:var(--warn); font-weight:600;}
+
+.cell-series{color:var(--muted); min-width:0;}
+.cell-lead{color:var(--ink); text-align:right;}
+.cell-risk{color:var(--muted);}
+.cell-risk.warn{color:var(--warn); font-weight:600;}
+.cell-compliance{color:var(--muted); font-size:11px;}
 
 .cell-qty{display:flex; align-items:center; justify-content:center;}
 .cell-qty-head{text-align:center;}
@@ -422,7 +428,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     </div>
   </div>
 
-  <div class="grid">
+  <div class="grid bom-collapsed" id="mainGrid">
     <!-- LEFT: search + results -->
     <div style="display:flex; flex-direction:column; gap:12px; min-width:0;">
 
@@ -483,6 +489,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
               <div class="col-menu" id="colMenu" hidden>
                 <label><input type="checkbox" id="colMfr" onchange="setColumn('manufacturer', this.checked)"> Manufacturer</label>
                 <label><input type="checkbox" id="colMoq" onchange="setColumn('moq', this.checked)"> MOQ</label>
+                <label><input type="checkbox" id="colPhoto" onchange="setColumn('photo', this.checked)"> Photo</label>
+                <label><input type="checkbox" id="colSeries" onchange="setColumn('series', this.checked)"> Series</label>
+                <label><input type="checkbox" id="colLead" onchange="setColumn('leadtime', this.checked)"> Lead time</label>
+                <label><input type="checkbox" id="colRisk" onchange="setColumn('risk', this.checked)"> Risk flags</label>
+                <label><input type="checkbox" id="colCompliance" onchange="setColumn('compliance', this.checked)"> Compliance</label>
+                <label><input type="checkbox" id="colDescription" onchange="setColumn('description', this.checked)"> Description</label>
+                <label><input type="checkbox" id="colCategory" onchange="setColumn('category', this.checked)"> Category</label>
+                <label><input type="checkbox" id="colCrossref" onchange="setColumn('crossref', this.checked)"> Cross-ref P/Ns</label>
               </div>
             </div>
           </div>
@@ -493,6 +507,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
             <div id="resultList"></div>
           </div>
         </div>
+        <div id="pagination"></div>
         <div class="results-foot">
           <button class="btn-primary" id="addRecQtyBtn" onclick="addAllRecQty()" disabled>Add Reccomended QTY</button>
         </div>
@@ -502,8 +517,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
       <div class="panel cart-panel">
         <div class="bom-head">
-          <h2>Cart</h2>
-          <span class="bom-count" id="cartCount">0 lines</span>
+          <span><h2 style="display:inline;">Cart</h2> <span class="bom-count" id="cartCount">0 lines</span></span>
+          <button class="linklike" onclick="toggleBomPanel()" id="bomToggleLink">Show BOM</button>
         </div>
         <div class="bom-list" id="cartList" style="max-height:none; overflow-y:visible;">
           <div class="bom-empty" id="cartEmpty">No parts added yet. Use + on a result above.</div>
@@ -525,8 +540,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
       </div>
     </div>
 
-    <!-- RIGHT: BOM -->
-    <div class="panel bom-panel">
+    <!-- RIGHT: BOM (hidden by default — revealed via Checkout or the "Show BOM" link) -->
+    <div class="panel bom-panel" id="bomPanel" hidden>
       <div class="bom-head">
         <h2>Bill of Materials</h2>
         <span class="bom-count" id="bomCount">0 lines</span>
@@ -559,11 +574,13 @@ let currentBlockTags = [];
 let searchBlocks = [];
 let searchRationale = "";
 let currentSortMode = "fit";
+let resultsPage = 0;
+const PAGE_SIZE = 5;
 let bom = [];
 let bomIdSeq = 1;
 let cart = [];
 let cartIdSeq = 1;
-let colState = { manufacturer: false, moq: false };
+let colState = { manufacturer: false, moq: false, photo: false, series: false, leadtime: false, risk: false, compliance: false, description: false, category: false, crossref: false };
 
 function allResultRows(){
   return searchBlocks.flatMap(b => b.results || []);
@@ -615,9 +632,35 @@ function applySearchResponse(data){
   const primary = searchBlocks[0] || {tags: [], results: [], keywords: ""};
   currentResults = primary.results.slice();
   currentBlockTags = primary.tags || [];
+  resultsPage = 0;
   renderInterp();
   sortResults(currentSortMode);
   renderExtraBlocks();
+}
+
+// Shared pagination: returns the current page's slice plus the clamped page
+// number (0-based) and total page count — callers assign the clamped page back
+// to their own state if they want out-of-range requests (e.g. "Next" past the
+// last page) to stick at the boundary instead of silently doing nothing.
+function paginate(arr, page){
+  const totalPages = Math.max(1, Math.ceil(arr.length / PAGE_SIZE));
+  const clamped = Math.min(Math.max(page, 0), totalPages - 1);
+  const start = clamped * PAGE_SIZE;
+  return {items: arr.slice(start, start + PAGE_SIZE), page: clamped, totalPages};
+}
+
+function paginationHtml(page, totalPages, prevCall, nextCall){
+  if(totalPages <= 1) return "";
+  return `<div class="pagination">
+    <button class="linklike" onclick="${prevCall}" ${page<=0 ? 'disabled' : ''}>‹ Prev</button>
+    <span class="page-indicator">Page ${page+1} of ${totalPages}</span>
+    <button class="linklike" onclick="${nextCall}" ${page>=totalPages-1 ? 'disabled' : ''}>Next ›</button>
+  </div>`;
+}
+
+function goToResultsPage(delta){
+  resultsPage += delta;
+  renderResults(lastRenderedArr);
 }
 
 function renderInterp(){
@@ -628,28 +671,40 @@ function renderInterp(){
   document.getElementById("whyLink").textContent = "How was this interpreted?";
 }
 
+function goToExtraBlockPage(blockIndex, delta){
+  const block = searchBlocks[blockIndex];
+  block._page = (block._page || 0) + delta;
+  renderExtraBlocks();
+}
+
 function renderExtraBlocks(){
   const container = document.getElementById("extraBlocks");
   const extras = searchBlocks.slice(1);
   if(!extras.length){ container.innerHTML = ""; return; }
 
   container.innerHTML = extras.map((block, i) => {
+    const blockIndex = i + 1; // absolute index into searchBlocks
     const tags = (block.tags || []).map(t=>`<span class="filter-chip">${t}</span>`).join("");
-    const rows = (block.results || []).length
-      ? block.results.map(r => buildResultRowHtml(r)).join("")
+    const results = block.results || [];
+    const {items, page, totalPages} = paginate(results, block._page || 0);
+    block._page = page;
+    const rows = items.length
+      ? items.map(r => buildResultRowHtml(r)).join("")
       : `<div class="bom-empty">No matches for this part.</div>`;
+    const pagination = paginationHtml(page, totalPages, `goToExtraBlockPage(${blockIndex},-1)`, `goToExtraBlockPage(${blockIndex},1)`);
     return `
       <div class="panel">
         <div class="results-toolbar">
-          <span>Also detected: <strong>${block.keywords}</strong> — <strong>${(block.results||[]).length}</strong> matches</span>
+          <span>Also detected: <strong>${block.keywords}</strong> — <strong>${results.length}</strong> matches</span>
           <span class="filter-chips">${tags}</span>
         </div>
         <div class="table-scroll">
-          <div class="parts-table">
+          <div class="parts-table" style="--cols:${buildColsString()}; min-width:${tableMinWidth()}px;">
             <div class="row-head">${buildHeaderCellsHtml()}</div>
             <div>${rows}</div>
           </div>
         </div>
+        ${pagination}
       </div>`;
   }).join("");
 }
@@ -682,38 +737,77 @@ function setColumn(name, checked){
 function buildColsString(){
   const cols = ["minmax(0,1.5fr)"];
   if(colState.manufacturer) cols.push("minmax(0,0.9fr)");
+  if(colState.series) cols.push("minmax(0,0.8fr)");
+  if(colState.category) cols.push("130px");
+  if(colState.description) cols.push("minmax(0,1.2fr)");
   cols.push("minmax(0,1.6fr)");
   cols.push("78px");
   if(colState.moq) cols.push("64px");
+  if(colState.leadtime) cols.push("64px");
   cols.push("64px");
   cols.push("72px");
   cols.push("76px");
+  if(colState.risk) cols.push("100px");
+  if(colState.compliance) cols.push("150px");
+  if(colState.crossref) cols.push("160px");
   cols.push("40px");
   cols.push("78px");
   return cols.join(" ");
 }
 
+// minmax(0,Xfr) tracks collapse toward 0 if the grid isn't given enough room for
+// every fixed-width track plus a sane minimum for the flexible ones — a static
+// CSS min-width can't keep up as more optional columns are toggled on, so this
+// is computed from the same colState the columns themselves are built from.
+function tableMinWidth(){
+  let w = 260; // Part (flex minimum)
+  if(colState.manufacturer) w += 130;
+  if(colState.series) w += 110;
+  if(colState.category) w += 130;
+  if(colState.description) w += 200;
+  w += 260; // Specs (flex minimum)
+  w += 78; // Stock
+  if(colState.moq) w += 64;
+  if(colState.leadtime) w += 64;
+  w += 64 + 72 + 76; // Unit, Qty 100, Lifecycle
+  if(colState.risk) w += 100;
+  if(colState.compliance) w += 150;
+  if(colState.crossref) w += 160;
+  w += 40 + 78; // Rec, Qty
+  return w;
+}
+
 function buildHeaderCellsHtml(){
   const cells = ["<div>Part</div>"];
   if(colState.manufacturer) cells.push("<div>Manufacturer</div>");
+  if(colState.series) cells.push("<div>Series</div>");
+  if(colState.category) cells.push("<div>Category</div>");
+  if(colState.description) cells.push("<div>Description</div>");
   cells.push("<div>Specs</div>");
   cells.push('<div class="right">Stock</div>');
   if(colState.moq) cells.push('<div class="right">MOQ</div>');
+  if(colState.leadtime) cells.push('<div class="right">Lead</div>');
   cells.push('<div class="right">Unit</div>');
   cells.push('<div class="right">Qty 100</div>');
   cells.push("<div>Lifecycle</div>");
+  if(colState.risk) cells.push("<div>Risk</div>");
+  if(colState.compliance) cells.push("<div>Compliance</div>");
+  if(colState.crossref) cells.push("<div>Cross-ref</div>");
   cells.push('<div class="cell-rec-head">Rec</div>');
   cells.push('<div class="cell-qty-head">Qty</div>');
   return cells.join("");
 }
 
 function renderHeader(){
-  document.getElementById("partsTable").style.setProperty("--cols", buildColsString());
+  const table = document.getElementById("partsTable");
+  table.style.setProperty("--cols", buildColsString());
+  table.style.minWidth = tableMinWidth() + "px";
   document.getElementById("rowHead").innerHTML = buildHeaderCellsHtml();
 }
 
 function sortResults(mode){
   currentSortMode = mode;
+  resultsPage = 0;
   let arr = currentResults.slice();
   if(mode === "fit") arr.sort((a,b)=> (b.best - a.best) || (b.matchScore - a.matchScore) || (b.stock - a.stock));
   if(mode === "price") arr.sort((a,b)=> a.price - b.price);
@@ -727,30 +821,76 @@ function refreshResults(){
   if(lastRenderedArr.length) renderResults(lastRenderedArr);
 }
 
+function riskFlags(r){
+  const flags = [];
+  if(r.discontinued) flags.push("Discontinued");
+  if(r.endOfLife) flags.push("EOL");
+  if(r.ncnr) flags.push("NCNR");
+  if(r.backOrderNotAllowed) flags.push("No B/O");
+  if(r.tariffActive) flags.push("Tariff");
+  if(r.marketplace) flags.push("Marketplace");
+  return flags;
+}
+
+function complianceParts(r){
+  const parts = [];
+  if(r.moistureSensitivityLevel) parts.push("MSL " + r.moistureSensitivityLevel);
+  if(r.exportControlClassNumber) parts.push(r.exportControlClassNumber);
+  if(r.reachStatus) parts.push(r.reachStatus);
+  return parts;
+}
+
 function buildResultRowHtml(r){
-  const total = r.matchTotal;
-  const alts = r.alts || [];
-  const safeId = r.dk.replace(/[^a-zA-Z0-9]/g, "");
-  const stockNote = r.status === "out" ? `<span class="stock-note">~12wk lead</span>`
+  const leadNote = r.leadWeeks ? `${r.leadWeeks} wk lead` : "lead time varies";
+  const stockNote = r.status === "out" ? `<span class="stock-note">${leadNote}</span>`
     : r.status === "low" ? `<span class="stock-note">low stock</span>` : "";
-  const dots = Array.from({length: total}, (_, i) => i < r.matchScore ? "●" : "○").join("");
+
+  const links = [];
+  if(r.datasheetUrl) links.push(`<a class="linklike" href="${r.datasheetUrl}" target="_blank" rel="noopener">Datasheet ↗</a>`);
+  if(r.productUrl) links.push(`<a class="linklike" href="${r.productUrl}" target="_blank" rel="noopener">DigiKey ↗</a>`);
+  const linkHtml = links.length ? ` · ${links.join(" · ")}` : "";
+  const photoHtml = (colState.photo && r.photoUrl) ? `<img class="part-thumb" src="${r.photoUrl}" alt="" onerror="this.remove()">` : "";
+
+  const breaks = r.priceBreaks || [];
+  const price100 = r.priceAt100 != null ? r.priceAt100 : r.price;
+  const breaksTitle = breaks.length
+    ? "Qty breaks: " + breaks.map(b => `${b.qty}=${fmtPrice(b.price)}`).join(", ")
+    : "No qty-break data from DigiKey — showing unit price";
 
   const cells = [];
   cells.push(`
-    <div class="cell-part">
-      <div class="mpn" title="${r.matchNote.replace(/"/g,'&quot;')}">${r.best ? '<span class="star">★</span>' : ''}${r.mpn}</div>
-      <div class="sub">DK# ${r.dk}${colState.manufacturer ? '' : ' · ' + r.mfr} · <a class="linklike" href="#" onclick="return false;">Datasheet ↗</a></div>
-      <div class="match ${r.matchScore < total ? 'partial' : ''}" title="${r.matchNote.replace(/"/g,'&quot;')}">${dots}<span class="frac">${r.matchScore}/${total}</span></div>
-      ${alts.length ? `<button class="linklike alt-link" onclick="toggleAlt('${safeId}')">+${alts.length} alternate${alts.length>1?'s':''}</button>` : ''}
-      ${alts.length ? `<div class="alt-panel" id="alt-row-${safeId}">${alts.map(a=>`<div class="alt-item"><span class="mono">${a.mpn}</span><span class="why">${a.why}</span></div>`).join("")}</div>` : ''}
+    <div class="cell-part${colState.photo ? ' has-photo' : ''}">
+      ${photoHtml}
+      <div class="part-text">
+        <div class="mpn" title="${r.matchNote.replace(/"/g,'&quot;')}">${r.best ? '<span class="star">★</span>' : ''}${r.mpn}</div>
+        <div class="sub">DK# ${r.dk}${colState.manufacturer ? '' : ' · ' + r.mfr}${linkHtml}</div>
+      </div>
     </div>`);
   if(colState.manufacturer) cells.push(`<div class="cell-mfr">${r.mfr}</div>`);
+  if(colState.series) cells.push(`<div class="cell-series">${r.series || '—'}</div>`);
+  if(colState.category) cells.push(`<div class="cell-series">${r.category || '—'}</div>`);
+  if(colState.description) cells.push(`<div class="cell-series" title="${(r.description||'').replace(/"/g,'&quot;')}">${r.description || '—'}</div>`);
   cells.push(`<div class="cell-specs">${r.attrs}${r.rohs ? ' · RoHS' : ''}</div>`);
   cells.push(`<div class="cell-stock ${r.status}"><span class="mono">${fmtStock(r.stock)}</span>${stockNote}</div>`);
   if(colState.moq) cells.push(`<div class="right mono">${r.moq > 1 ? r.moq.toLocaleString() : '—'}</div>`);
+  if(colState.leadtime) cells.push(`<div class="cell-lead mono">${r.leadWeeks ? r.leadWeeks + 'wk' : '—'}</div>`);
   cells.push(`<div class="right mono">${fmtPrice(r.price)}</div>`);
-  cells.push(`<div class="right mono">${money(r.price*100)}</div>`);
+  cells.push(`<div class="right mono" title="${breaksTitle.replace(/"/g,'&quot;')}">${money(price100*100)}</div>`);
   cells.push(`<div class="cell-life ${r.lifecycle === 'NRND' ? 'life-warn' : ''}">${r.lifecycle}</div>`);
+  if(colState.risk){
+    const flags = riskFlags(r);
+    cells.push(`<div class="cell-risk ${flags.length ? 'warn' : ''}">${flags.length ? flags.join(', ') : '—'}</div>`);
+  }
+  if(colState.compliance){
+    const parts = complianceParts(r);
+    cells.push(`<div class="cell-compliance">${parts.length ? parts.join(' · ') : '—'}</div>`);
+  }
+  if(colState.crossref){
+    const names = r.otherNames || [];
+    const shown = names.slice(0,2).join(", ");
+    const more = names.length > 2 ? ` +${names.length-2} more` : "";
+    cells.push(`<div class="cell-compliance" title="${names.join(', ').replace(/"/g,'&quot;')}">${names.length ? shown+more : '—'}</div>`);
+  }
   const cartLine = cart.find(c => c.dk === r.dk);
   const cartQty = cartLine ? cartLine.qty : 0;
   const rec = recommendedQty(nextDesignators(r));
@@ -768,20 +908,21 @@ function buildResultRowHtml(r){
 }
 
 function renderResults(arr){
-  lastRenderedArr = arr;
+  lastRenderedArr = arr; // full, unsliced — addAllRecQty() intentionally acts on every match, not just the visible page
   document.getElementById("resultCount").textContent = arr.length;
   document.getElementById("addRecQtyBtn").disabled = arr.length === 0;
   renderHeader();
   const list = document.getElementById("resultList");
+  const paginationEl = document.getElementById("pagination");
   if(!arr.length){
     list.innerHTML = `<div class="bom-empty" style="padding:28px 15px;">No matching parts found for this query. Try loosening a constraint (tolerance, package, voltage) and search again.</div>`;
+    paginationEl.innerHTML = "";
     return;
   }
-  list.innerHTML = arr.map(r => buildResultRowHtml(r)).join("");
-}
-
-function toggleAlt(id){
-  document.getElementById("alt-row-"+id).classList.toggle("open");
+  const {items, page, totalPages} = paginate(arr, resultsPage);
+  resultsPage = page;
+  list.innerHTML = items.map(r => buildResultRowHtml(r)).join("");
+  paginationEl.innerHTML = paginationHtml(page, totalPages, "goToResultsPage(-1)", "goToResultsPage(1)");
 }
 
 function setMode(mode){
@@ -826,6 +967,7 @@ async function runBatch(){
     if(batchRows.length) searchBlocks.push({keywords: "Paste BOM", tags: [], results: batchRows});
 
     renderBom();
+    if(added) setBomPanelVisible(true);
     showToast(`Resolved ${added} line${added===1?'':'s'}` + (unresolved ? `, ${unresolved} need review` : ""));
   } catch(err){
     console.error(err);
@@ -945,7 +1087,18 @@ function checkout(){
   renderCart();
   renderBom();
   refreshResults();
+  setBomPanelVisible(true);
   showToast(`Moved ${count} line${count===1?'':'s'} to BOM`);
+}
+
+function setBomPanelVisible(show){
+  document.getElementById("bomPanel").hidden = !show;
+  document.getElementById("mainGrid").classList.toggle("bom-collapsed", !show);
+  document.getElementById("bomToggleLink").textContent = show ? "Hide BOM" : "Show BOM";
+}
+
+function toggleBomPanel(){
+  setBomPanelVisible(document.getElementById("bomPanel").hidden);
 }
 
 function renderCart(){
