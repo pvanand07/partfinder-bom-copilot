@@ -710,7 +710,7 @@ body.modal-open{overflow:hidden;}
         </div>
         <div id="pagination"></div>
         <div class="results-foot">
-          <button class="btn-primary" id="addRecQtyBtn" onclick="addAllRecQty()" disabled>Add Reccomended QTY</button>
+          <button class="btn-primary" id="addRecQtyBtn" onclick="addAllRecQty()" hidden>Add AI-picked qty</button>
         </div>
       </div>
 
@@ -1228,9 +1228,13 @@ function buildResultRowHtml(r){
 }
 
 function renderResults(arr){
-  lastRenderedArr = arr; // full, unsliced — addAllRecQty() intentionally acts on every match, not just the visible page
+  lastRenderedArr = arr; // full, unsliced — addAllRecQty() intentionally acts on every AI-picked match, not just the visible page
   document.getElementById("resultCount").textContent = arr.length;
-  document.getElementById("addRecQtyBtn").disabled = arr.length === 0;
+  // Only appears once the AI recommendation pass has actually picked something —
+  // before that (or if the model never highlights anything for this search) there's
+  // nothing for this button to add, and showing it as merely "disabled" while a
+  // real MOQ fallback qty is visible in every row reads as broken, not pending.
+  document.getElementById("addRecQtyBtn").hidden = !arr.some(r => r.highlight);
   renderHeader();
   const list = document.getElementById("resultList");
   const paginationEl = document.getElementById("pagination");
@@ -1340,9 +1344,10 @@ function changeResultCartQty(dk, delta){
 }
 
 function addAllRecQty(){
-  if(!lastRenderedArr.length){ showToast("No results to add"); return; }
+  const picks = lastRenderedArr.filter(r => r.highlight);
+  if(!picks.length){ showToast("No AI-picked parts to add yet"); return; }
   let added = 0;
-  lastRenderedArr.forEach(r => {
+  picks.forEach(r => {
     const rec = recQtyFor(r);
     const existing = cart.find(l => l.dk === r.dk);
     if(!existing || existing.qty !== rec){
@@ -1352,7 +1357,7 @@ function addAllRecQty(){
   });
   renderCart();
   refreshResults();
-  showToast(added ? `Set recommended qty for ${added} part${added === 1 ? "" : "s"}` : "All parts already at recommended qty");
+  showToast(added ? `Added ${added} AI-picked part${added === 1 ? "" : "s"} at recommended qty` : "AI picks already at recommended qty");
 }
 
 // Recommended quantity: an LLM pass (fetchRecommendations, run after the deterministic
@@ -1931,7 +1936,7 @@ document.addEventListener("click", e => {
 
 function renderIdleState(){
   document.getElementById("resultCount").textContent = "0";
-  document.getElementById("addRecQtyBtn").disabled = true;
+  document.getElementById("addRecQtyBtn").hidden = true;
   renderHeader();
   document.getElementById("resultList").innerHTML = `<div class="bom-empty" style="padding:28px 15px;">Type a query above and hit Search to see real DigiKey results.</div>`;
   document.getElementById("pagination").innerHTML = "";
