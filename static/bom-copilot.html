@@ -1,4 +1,5 @@
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>DigiSearch</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Source+Sans+3:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
@@ -127,7 +128,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 .tuner-panel{
   position:absolute; top:calc(100% + 6px); right:0; z-index:20;
-  width:280px; max-height:min(560px, 80vh); overflow-y:auto;
+  width:min(280px, calc(100vw - 24px)); max-height:min(560px, 80vh); overflow-y:auto;
   background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md);
   box-shadow:var(--shadow-sm); padding:12px 14px 13px;
   transform-origin:top right;
@@ -857,6 +858,88 @@ body.modal-open{overflow:hidden;}
   .detail-list{grid-template-columns:1fr;}
   .detail-list dt{border-bottom:0; padding-bottom:0;}
   .detail-list dd{padding-top:2px;}
+  .buy-actions{flex-wrap:wrap;}
+  .buy-actions .btn-primary{flex:1 1 auto;}
+}
+
+/* Compact screens only — desktop layout above 900px is unchanged */
+@media (max-width:900px){
+  html, body{overflow-x:hidden; max-width:100%;}
+  .app{
+    padding:12px max(12px, env(safe-area-inset-right)) 28px max(12px, env(safe-area-inset-left));
+  }
+  .topbar{flex-wrap:wrap; gap:10px; padding-bottom:12px;}
+  .topbar-actions{margin-left:auto;}
+  .search-box{flex-wrap:wrap;}
+  .search-box input{min-width:0; flex:1 1 160px;}
+  .batch-foot{flex-wrap:wrap; justify-content:flex-start;}
+  .results-toolbar{flex-wrap:wrap; gap:8px 14px; align-items:flex-start;}
+  .toolbar-controls{flex-wrap:wrap; gap:8px 14px;}
+  .table-scroll{overflow:visible;}
+  .parts-table{min-width:0 !important; width:100%;}
+  .row-head{display:none;}
+  .row{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0,1fr));
+    gap:8px 14px;
+    padding:12px 14px;
+    align-items:start;
+  }
+  .row > .cell-part,
+  .row > .cell-specs,
+  .row > .cell-rec,
+  .row > .cell-qty,
+  .row > [data-label="Description"],
+  .row > [data-label="Cross-ref"]{
+    grid-column:1 / -1;
+  }
+  .row > [data-label]::before{
+    content:attr(data-label);
+    display:block;
+    font-size:10px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    color:var(--muted);
+    margin-bottom:2px;
+  }
+  .row > .right,
+  .row > .cell-stock,
+  .row > .cell-lead{text-align:left;}
+  .cell-part .mpn{overflow-wrap:anywhere;}
+  .cell-qty{justify-content:flex-start;}
+  .cell-qty .qty-step, .bom-remove, .qty-step{
+    width:32px; height:32px;
+  }
+  .photo-flyout{display:none !important;}
+  .toast{
+    max-width:calc(100vw - 24px);
+    left:12px; right:12px; transform:none; text-align:center;
+    bottom:max(16px, env(safe-area-inset-bottom));
+  }
+  .toast.show{transform:none;}
+  .photo-lightbox{padding:12px;}
+  .product-dialog-titles{gap:6px;}
+}
+@media (max-width:560px){
+  .brand-name{font-size:20px;}
+  .search-box{padding:8px;}
+  .btn-search{flex:1 1 100%;}
+  .examples-label{width:100%;}
+  .bom-head{flex-wrap:wrap;}
+  .bom-row{
+    grid-template-columns:minmax(0,1fr) auto;
+    grid-template-areas:"main remove" "qty total";
+  }
+  .bom-row-main{grid-area:main;}
+  .bom-remove{grid-area:remove;}
+  .bom-qty{grid-area:qty;}
+  .bom-linetotal{grid-area:total; justify-self:end; align-self:center;}
+  .bom-actions{flex-wrap:wrap;}
+}
+@media (max-width:420px){
+  .row{grid-template-columns:minmax(0,1fr);}
+  .part-photo, .part-thumb{width:48px; height:48px;}
 }
 </style>
 
@@ -873,7 +956,7 @@ body.modal-open{overflow:hidden;}
       <span class="brand-name">DigiSearch</span>
     </a>
 
-    <div style="display:flex; align-items:center; gap:8px;">
+    <div class="topbar-actions" style="display:flex; align-items:center; gap:8px;">
       <button class="tuner-toggle" onclick="toggleDemoMode()" id="demoToggle" title="Use closest cached searches and LLM recommendations — no live DigiKey or OpenRouter calls">Demo mode</button>
       <div style="position:relative;">
         <button class="tuner-toggle" onclick="toggleTuner()"><span class="swatch-dot" id="tunerDot"></span>Colors</button>
@@ -1448,39 +1531,39 @@ function buildResultRowHtml(r){
         <div class="sub">DK# ${r.dk}${colState.manufacturer ? '' : ' · ' + r.mfr}${linkHtml}</div>
       </div>
     </div>`);
-  if(colState.manufacturer) cells.push(`<div class="cell-mfr">${r.mfr}</div>`);
-  if(colState.series) cells.push(`<div class="cell-series">${r.series || '—'}</div>`);
-  if(colState.category) cells.push(`<div class="cell-series">${r.category || '—'}</div>`);
-  if(colState.description) cells.push(`<div class="cell-series" title="${(r.description||'').replace(/"/g,'&quot;')}">${r.description || '—'}</div>`);
-  cells.push(`<div class="cell-specs">${r.attrs}${r.rohs ? ' · RoHS' : ''}</div>`);
-  cells.push(`<div class="cell-stock ${r.status}"><span class="mono">${fmtStock(r.stock)}</span>${stockNote}</div>`);
-  if(colState.moq) cells.push(`<div class="right mono">${r.moq > 1 ? r.moq.toLocaleString() : '—'}</div>`);
-  if(colState.leadtime) cells.push(`<div class="cell-lead mono">${r.leadWeeks ? r.leadWeeks + 'wk' : '—'}</div>`);
-  cells.push(`<div class="right mono">${fmtPrice(r.price)}</div>`);
-  cells.push(`<div class="right mono" title="${breaksTitle.replace(/"/g,'&quot;')}">${money(price100*100)}</div>`);
-  cells.push(`<div class="cell-life ${r.lifecycle === 'NRND' ? 'life-warn' : ''}">${r.lifecycle}</div>`);
+  if(colState.manufacturer) cells.push(`<div class="cell-mfr" data-label="Manufacturer">${r.mfr}</div>`);
+  if(colState.series) cells.push(`<div class="cell-series" data-label="Series">${r.series || '—'}</div>`);
+  if(colState.category) cells.push(`<div class="cell-series" data-label="Category">${r.category || '—'}</div>`);
+  if(colState.description) cells.push(`<div class="cell-series" data-label="Description" title="${(r.description||'').replace(/"/g,'&quot;')}">${r.description || '—'}</div>`);
+  cells.push(`<div class="cell-specs" data-label="Specs">${r.attrs}${r.rohs ? ' · RoHS' : ''}</div>`);
+  cells.push(`<div class="cell-stock ${r.status}" data-label="Stock"><span class="mono">${fmtStock(r.stock)}</span>${stockNote}</div>`);
+  if(colState.moq) cells.push(`<div class="right mono" data-label="MOQ">${r.moq > 1 ? r.moq.toLocaleString() : '—'}</div>`);
+  if(colState.leadtime) cells.push(`<div class="cell-lead mono" data-label="Lead">${r.leadWeeks ? r.leadWeeks + 'wk' : '—'}</div>`);
+  cells.push(`<div class="right mono" data-label="Unit">${fmtPrice(r.price)}</div>`);
+  cells.push(`<div class="right mono" data-label="Qty 100" title="${breaksTitle.replace(/"/g,'&quot;')}">${money(price100*100)}</div>`);
+  cells.push(`<div class="cell-life ${r.lifecycle === 'NRND' ? 'life-warn' : ''}" data-label="Lifecycle">${r.lifecycle}</div>`);
   if(colState.risk){
     const flags = riskFlags(r);
-    cells.push(`<div class="cell-risk ${flags.length ? 'warn' : ''}">${flags.length ? flags.join(', ') : '—'}</div>`);
+    cells.push(`<div class="cell-risk ${flags.length ? 'warn' : ''}" data-label="Risk">${flags.length ? flags.join(', ') : '—'}</div>`);
   }
   if(colState.compliance){
     const parts = complianceParts(r);
-    cells.push(`<div class="cell-compliance">${parts.length ? parts.join(' · ') : '—'}</div>`);
+    cells.push(`<div class="cell-compliance" data-label="Compliance">${parts.length ? parts.join(' · ') : '—'}</div>`);
   }
   if(colState.crossref){
     const names = r.otherNames || [];
     const shown = names.slice(0,2).join(", ");
     const more = names.length > 2 ? ` +${names.length-2} more` : "";
-    cells.push(`<div class="cell-compliance" title="${names.join(', ').replace(/"/g,'&quot;')}">${names.length ? shown+more : '—'}</div>`);
+    cells.push(`<div class="cell-compliance" data-label="Cross-ref" title="${names.join(', ').replace(/"/g,'&quot;')}">${names.length ? shown+more : '—'}</div>`);
   }
   const cartLine = cart.find(c => c.dk === r.dk);
   const cartQty = cartLine ? cartLine.qty : 0;
   const rec = recQtyFor(r);
-  cells.push(`<div class="cell-rec ${cartQty >= rec && cartQty > 0 ? 'met' : ''}${r.recommendedQty == null ? ' pending' : ''}">
+  cells.push(`<div class="cell-rec ${cartQty >= rec && cartQty > 0 ? 'met' : ''}${r.recommendedQty == null ? ' pending' : ''}" data-label="AI recommendation">
     <div class="cell-rec-qty mono">${rec.toLocaleString()}</div>
     ${r.recommendedQty != null ? `<div class="cell-rec-reason">${escHtml(r.reason || "AI-recommended quantity")}</div>` : ""}
   </div>`);
-  cells.push(`<div class="cell-qty">
+  cells.push(`<div class="cell-qty" data-label="Qty">
     <div class="bom-qty">
       <button class="qty-step" onclick="changeResultCartQty('${r.dk}', -1)" aria-label="Decrease quantity"${cartQty === 0 ? ' disabled' : ''}>−</button>
       <span class="qty-frac mono ${cartQty >= rec && cartQty > 0 ? 'met' : ''}" title="Quantity in cart">${cartQty}</span>
@@ -2149,6 +2232,7 @@ function lightboxOpen(){ return !document.getElementById("photoLightbox").hidden
 
 function showPhotoFlyout(anchor, url){
   if(!url || lightboxOpen()) return;
+  if(window.matchMedia("(max-width:900px)").matches) return;
   const fly = photoFlyoutEl();
   const img = fly.querySelector("img");
   if(img.src !== url) img.src = url;
