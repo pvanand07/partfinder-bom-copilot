@@ -1044,6 +1044,7 @@ body.modal-open{overflow:hidden;}
         </div>
         <div id="pagination"></div>
         <div class="results-foot">
+          <button class="linklike" id="exportResultsBtn" onclick="exportSearchResults()" hidden>Export results (Excel)</button>
           <button class="btn-primary" id="addRecQtyBtn" onclick="addAllRecQty()" hidden>Add AI-picked qty</button>
         </div>
       </div>
@@ -1585,6 +1586,7 @@ function renderResults(arr){
   // nothing for this button to add, and showing it as merely "disabled" while a
   // real MOQ fallback qty is visible in every row reads as broken, not pending.
   document.getElementById("addRecQtyBtn").hidden = !arr.some(r => r.highlight);
+  document.getElementById("exportResultsBtn").hidden = allResultRows().length === 0;
   renderHeader();
   const list = document.getElementById("resultList");
   const paginationEl = document.getElementById("pagination");
@@ -1990,6 +1992,38 @@ async function exportBom(){
     a.remove();
     URL.revokeObjectURL(url);
     showToast("Downloaded Excel BOM (" + bom.length + " line" + (bom.length===1?"":"s") + ")");
+  } catch(err){
+    console.error(err);
+    showToast("Export failed — is the backend running at " + API_BASE + "?");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prevLabel;
+  }
+}
+async function exportSearchResults(){
+  const rows = allResultRows();
+  if(rows.length===0){ showToast("No search results to export"); return; }
+  const btn = document.getElementById("exportResultsBtn");
+  const prevLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Exporting…";
+  try{
+    const res = await fetch(`${API_BASE}/api/export-results`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({results: rows})
+    });
+    if(!res.ok) throw new Error(`Export failed (${res.status})`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `DigiSearch-Results-${new Date().toISOString().slice(0,10)}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast("Downloaded Excel (" + rows.length + " result" + (rows.length===1?"":"s") + ")");
   } catch(err){
     console.error(err);
     showToast("Export failed — is the backend running at " + API_BASE + "?");
@@ -2441,6 +2475,7 @@ document.addEventListener("click", e => {
 function renderIdleState(){
   document.getElementById("resultCount").textContent = "0";
   document.getElementById("addRecQtyBtn").hidden = true;
+  document.getElementById("exportResultsBtn").hidden = true;
   renderHeader();
   document.getElementById("resultList").innerHTML = `<div class="bom-empty" style="padding:28px 15px;">Type a query above and hit Search to see real DigiKey results.</div>`;
   document.getElementById("pagination").innerHTML = "";

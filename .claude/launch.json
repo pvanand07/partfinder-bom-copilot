@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8123", "--directory", "static"],
       "port": 8123
+    },
+    {
+      "name": "api-server",
+      "runtimeExecutable": "C:\\Python313\\python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "server.main:app", "--port", "8000"],
+      "port": 8000
     }
   ]
 }

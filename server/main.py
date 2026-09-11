@@ -12,13 +12,14 @@ from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from server import nl_parser, ranking, search_cache
-from server.bom_export import build_bom_workbook
+from server.bom_export import build_bom_workbook, build_search_results_workbook
 from server.digikey_client import DigikeyClient, DigikeyError
 from server.schemas import (
     BatchLineResult,
     BatchSearchRequest,
     BatchSearchResponse,
     BomExportRequest,
+    ExportResultsRequest,
     ParsedItem,
     ParseResult,
     Recommendation,
@@ -391,6 +392,19 @@ def export_bom(req: BomExportRequest):
         raise HTTPException(status_code=400, detail="BOM is empty")
     data = build_bom_workbook([line.model_dump() for line in req.lines])
     filename = f"DigiSearch-BOM-{datetime.now().strftime('%Y-%m-%d')}.xlsx"
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.post("/api/export-results")
+def export_results(req: ExportResultsRequest):
+    if not req.results:
+        raise HTTPException(status_code=400, detail="No search results to export")
+    data = build_search_results_workbook([row.model_dump() for row in req.results])
+    filename = f"DigiSearch-Results-{datetime.now().strftime('%Y-%m-%d')}.xlsx"
     return Response(
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

@@ -87,6 +87,23 @@ DETAIL_WIDTHS = [
     18, 18, 14,
 ]
 
+# Search results: same catalog fields as Part Details, minus BOM-only Designator/Qty.
+RESULTS_HEADERS = [
+    "Item", "Manufacturer", "MPN", "DigiKey PN",
+    "Description", "Category", "Series", "Specs", "Stock", "Status",
+    "Unit Price", "MOQ", "Price at 100", "Lifecycle", "RoHS", "REACH", "MSL",
+    "ECCN", "HTSUS", "Lead weeks", "Discontinued", "End of life", "NCNR",
+    "Marketplace", "Tariff active", "Match", "Other names", "Price breaks",
+    "Datasheet", "Product page", "Photo",
+]
+RESULTS_WIDTHS = [
+    7, 22, 24, 28, 38, 22, 16, 40, 12, 10,
+    13, 10, 14, 14, 10, 18, 12,
+    12, 14, 12, 14, 14, 10,
+    14, 14, 28, 32, 28,
+    18, 18, 14,
+]
+
 
 def _cell(ws, row, col, value, *, font=FONT_BODY, fill=None, align=LEFT, num_fmt=None, border=True):
     cell = ws.cell(row, col)
@@ -388,3 +405,113 @@ def _write_details_sheet(ws, lines: list[dict], stamp: str) -> None:
     ws.freeze_panes = f"C{first_data}"
     ws.print_area = f"A1:{get_column_letter(cols)}{last_data}"
     _print_setup(ws, "1:5", "Part Details", tabloid=True)
+
+
+def build_search_results_workbook(rows: list[dict]) -> bytes:
+    now = datetime.now().astimezone()
+    stamp = now.strftime("%Y-%m-%d %H:%M")
+
+    wb = Workbook()
+    wb.properties.title = "DigiSearch Search Results"
+    wb.properties.creator = "DigiSearch"
+    _write_results_sheet(wb.active, rows, stamp)
+
+    buf = BytesIO()
+    wb.save(buf)
+    return _sanitize_xlsx(buf.getvalue())
+
+
+def _write_results_sheet(ws, rows: list[dict], stamp: str) -> None:
+    ws.title = "Search Results"
+    ws.sheet_properties.tabColor = COPPER
+    cols = len(RESULTS_HEADERS)
+    _banner(
+        ws, cols,
+        "Search Results",
+        "Catalog, stock, lifecycle, and sourcing fields for every match on screen",
+        f"Exported {stamp}    {len(rows)} result{'s' if len(rows) != 1 else ''}",
+    )
+
+    header_row = 6
+    first_data = header_row + 1
+    last_data = header_row + max(len(rows), 1)
+
+    for i, (title, width) in enumerate(zip(RESULTS_HEADERS, RESULTS_WIDTHS), start=1):
+        _cell(ws, header_row, i, title, font=FONT_HEAD, fill=FILL_HEAD, align=CENTER_WRAP)
+        ws.column_dimensions[get_column_letter(i)].width = width
+    ws.row_dimensions[header_row].height = 28
+
+    data_rows = rows or [{}]
+    for idx, part in enumerate(data_rows, start=1):
+        row = header_row + idx
+        fill = FILL_BAND if idx % 2 == 0 else FILL_PAPER
+        datasheet = (part.get("datasheetUrl") or "").strip()
+        product = (part.get("productUrl") or "").strip()
+        photo = (part.get("photoUrl") or "").strip()
+        match_total = part.get("matchTotal")
+        match_score = part.get("matchScore")
+        match = ""
+        if match_score is not None and match_total is not None:
+            match = f"{match_score} / {match_total}"
+            note = part.get("matchNote") or ""
+            if note:
+                match = f"{match} — {note}"
+        status = (part.get("status") or "").lower()
+        stock_fill = FILL_BAD if status == "out" else FILL_WARN if status == "low" else FILL_GOOD if status == "in" else fill
+
+        values = [
+            idx if rows else "",
+            part.get("mfr") or "", part.get("mpn") or "", part.get("dk") or "",
+            part.get("description") or "", part.get("category") or "", part.get("series") or "",
+            part.get("attrs") or "", int(part.get("stock") or 0) if rows else "",
+            part.get("status") or "",
+            float(part.get("price") or 0) if rows else "", int(part.get("moq") or 1) if rows else "",
+            part.get("priceAt100"),
+            part.get("lifecycle") or "",
+            "Yes" if part.get("rohs") else "No" if "rohs" in part else "",
+            part.get("reachStatus") or "", part.get("moistureSensitivityLevel") or "",
+            part.get("exportControlClassNumber") or "", part.get("htsusCode") or "",
+            part.get("leadWeeks") if part.get("leadWeeks") not in (None, "") else "",
+            _yes_no(part.get("discontinued")), _yes_no(part.get("endOfLife")),
+            _yes_no(part.get("ncnr")), _yes_no(part.get("marketplace")),
+            _yes_no(part.get("tariffActive")),
+            match, ", ".join(part.get("otherNames") or []), _breaks(part),
+            datasheet or "—", product or "—", photo or "—",
+        ]
+        ws.row_dimensions[row].height = 20
+        for col, val in enumerate(values, start=1):
+            font = FONT_MONO if col in (3, 4, 18, 19) else FONT_BODY
+            align = CENTER if col in (1, 10, 14, 15, 21, 22, 23, 24, 25) else LEFT_WRAP if col in (5, 8, 26, 27, 28) else LEFT
+            fmt = None
+            cell_fill = fill
+            if col == 9:
+                cell_fill = stock_fill
+            if col == 11:
+                fmt = '"$"#,##0.0000'
+                align = RIGHT
+                font = FONT_MONO
+            elif col == 13:
+                fmt = '"$"#,##0.0000'
+                align = RIGHT
+                font = FONT_MONO
+            elif col in (9, 12):
+                fmt = "#,##0"
+                align = RIGHT
+            cell = _cell(ws, row, col, val if val is not None else "", font=font, fill=cell_fill, align=align, num_fmt=fmt)
+            if col == 29 and datasheet:
+                cell.value = "Open datasheet"
+                cell.font = FONT_LINK
+                cell.hyperlink = datasheet
+            elif col == 30 and product:
+                cell.value = "Open product page"
+                cell.font = FONT_LINK
+                cell.hyperlink = product
+            elif col == 31 and photo:
+                cell.value = "Open photo"
+                cell.font = FONT_LINK
+                cell.hyperlink = photo
+
+    _add_table(ws, "SearchResults", RESULTS_HEADERS, header_row, last_data)
+    ws.freeze_panes = f"B{first_data}"
+    ws.print_area = f"A1:{get_column_letter(cols)}{last_data}"
+    _print_setup(ws, "1:5", "Search Results", tabloid=True)

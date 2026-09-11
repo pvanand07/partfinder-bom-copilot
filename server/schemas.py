@@ -160,3 +160,7 @@ class BomExportLine(BaseModel):
 
 class BomExportRequest(BaseModel):
     lines: list[BomExportLine]
+
+
+class ExportResultsRequest(BaseModel):
+    results: list[ResultRow]
